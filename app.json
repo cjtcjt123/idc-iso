@@ -1,0 +1,35 @@
+{
+  "expo": {
+    "name": "IDC管理工具",
+    "slug": "idcops-ios",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "idcops",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "icon": "./assets/icon.png",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.idcops.app",
+      "infoPlist": {
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        },
+        "NSCameraUsageDescription": "用于扫码入库与识别物料条码"
+      }
+    },
+    "android": {
+      "package": "com.idcops.app",
+      "permissions": [
+        "CAMERA"
+      ],
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0B1F3A"
+      }
+    },
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}
