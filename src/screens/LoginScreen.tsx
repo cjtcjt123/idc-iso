@@ -32,8 +32,15 @@ export function LoginScreen() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <View style={styles.inner}>
-        <Text style={styles.logo}>IDC 运维</Text>
-        <Text style={styles.sub}>数据中心资产管理</Text>
+        {/* 未登录也能改地址：连点标题 5 次 → 输口令 → 解锁编辑（避免连不上后端时进不了设置页） */}
+        <ServerAddressEditor
+          trigger={
+            <View>
+              <Text style={styles.logo}>IDC 运维</Text>
+              <Text style={styles.sub}>数据中心资产管理</Text>
+            </View>
+          }
+        />
         <View style={styles.form}>
           <Input
             placeholder="账号 / 邮箱"
@@ -49,7 +56,7 @@ export function LoginScreen() {
           />
           <Button label="登录" onPress={submit} loading={loading} />
         </View>
-        <Text style={styles.hint}>后端地址请在「我的」中配置</Text>
+        <Text style={styles.hint}>连点上方标题 5 次可配置服务器地址</Text>
       </View>
     </KeyboardAvoidingView>
   );
