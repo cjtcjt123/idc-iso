@@ -19,7 +19,6 @@ export function ProfileScreen({ navigation }: any) {
             />
             <View>
               <Text style={styles.appName}>IDC管理工具</Text>
-              <Text style={styles.tip}>连点图标 5 次可配置服务器</Text>
             </View>
           </View>
         }
@@ -70,5 +69,4 @@ const styles = StyleSheet.create({
   },
   icon: { width: 56, height: 56, borderRadius: 14, marginRight: 14 },
   appName: { fontSize: 20, fontWeight: "800", color: "#101828" },
-  tip: { fontSize: 12, color: "#94a3b8", marginTop: 4 },
 });

@@ -1,5 +1,6 @@
-// 运行配置：默认后端地址（用户可在「我的」页修改）。
-export const DEFAULT_BASE_URL = "http://192.168.0.109:3000";
+// 运行配置：默认后端地址（指向飞牛 NAS 公网入口，与小程序/web 共用同一后端）。
+// 如临时需切回本机调试，用登录页/我的页「连点图标 5 次 + 口令」应急入口改。
+export const DEFAULT_BASE_URL = "https://cjtsmq.xyz";
 export const API_PREFIX = "/api/v1";
 
 /**

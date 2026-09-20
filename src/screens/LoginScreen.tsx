@@ -32,7 +32,7 @@ export function LoginScreen() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <View style={styles.inner}>
-        {/* 未登录也能改地址：连点标题 5 次 → 输口令 → 解锁编辑（避免连不上后端时进不了设置页） */}
+        {/* 未登录也能改地址：连点标题 5 次 → 输口令 → 解锁编辑（无声入口，不暴露提示文字） */}
         <ServerAddressEditor
           trigger={
             <View>
@@ -56,7 +56,6 @@ export function LoginScreen() {
           />
           <Button label="登录" onPress={submit} loading={loading} />
         </View>
-        <Text style={styles.hint}>连点上方标题 5 次可配置服务器地址</Text>
       </View>
     </KeyboardAvoidingView>
   );
@@ -68,5 +67,4 @@ const styles = StyleSheet.create({
   logo: { fontSize: 30, fontWeight: "800", color: theme.text1, textAlign: "center" },
   sub: { fontSize: 14, color: theme.text3, textAlign: "center", marginTop: 6, marginBottom: 28 },
   form: { backgroundColor: theme.surface, borderRadius: 16, padding: 16 },
-  hint: { textAlign: "center", color: theme.text3, fontSize: 12, marginTop: 18 },
 });
