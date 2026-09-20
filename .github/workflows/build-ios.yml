@@ -67,14 +67,19 @@ jobs:
           cd "$GITHUB_WORKSPACE/ios"
           WORKSPACE=$(find . -maxdepth 1 -name "*.xcworkspace" | head -1)
           if [ -z "$WORKSPACE" ]; then echo "ERROR: no .xcworkspace (pod install failed?)"; ls -la; exit 1; fi
-          SCHEMES=$(xcodebuild -list -workspace "$WORKSPACE" 2>/dev/null | awk '/Schemes:/{f=1;next} f&&NF{print $1}')
-          # 排除 Pods / RN / Expo 依赖生成的 scheme（boost / FBLazyVector / FBReactNativeSpec /
-          # hermes / yoga / folly / glog / doubleconversion / React* / RCT* / Pods-* / Expo* 等），
-          # 取 App 主 scheme。绝不能用“第一个 scheme”，否则会误选 boost / FBLazyVector 资源包。
-          SCHEME=$(echo "$SCHEMES" | grep -viE "boost|privacy|fb|lazy|hermes|react|yoga|folly|glog|doubleconversion|expo|pods|rct" | head -1)
-          [ -z "$SCHEME" ] && SCHEME=$(echo "$SCHEMES" | head -1)
+          # 直接用 .xcodeproj 文件名作 scheme —— Expo 生成的主 scheme 名恒等于项目名，
+          # 绝不用 xcodebuild -list 取第一个（会误选 Pods 的 boost / FBLazyVector 等资源包 scheme）。
+          PROJ=$(find . -maxdepth 1 -name "*.xcodeproj" | head -1)
+          if [ -z "$PROJ" ]; then echo "ERROR: no .xcodeproj"; ls -la; exit 1; fi
+          SCHEME=$(basename "$PROJ" .xcodeproj)
+          # 兜底：若列表里确实没有该 scheme（极少见），再排除依赖资源包后取第一个
+          if ! xcodebuild -list -workspace "$WORKSPACE" 2>/dev/null | awk '/Schemes:/{f=1;next} f&&NF{print $1}' | grep -qx "$SCHEME"; then
+            SCHEME=$(xcodebuild -list -workspace "$WORKSPACE" 2>/dev/null \
+              | awk '/Schemes:/{f=1;next} f&&NF{print $1}' \
+              | grep -viE "boost|fb|lazy|hermes|react|yoga|folly|glog|doubleconversion|expo|pods|rct|privacy" | head -1)
+          fi
           if [ -z "$SCHEME" ]; then echo "ERROR: could not detect scheme"; xcodebuild -list -workspace "$WORKSPACE"; exit 1; fi
-          echo "WORKSPACE=$WORKSPACE SCHEME=$SCHEME (all: $SCHEMES)"
+          echo "WORKSPACE=$WORKSPACE PROJ=$PROJ SCHEME=$SCHEME"
           xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" \
             -configuration Release clean archive \
             -destination 'generic/platform=iOS' \
