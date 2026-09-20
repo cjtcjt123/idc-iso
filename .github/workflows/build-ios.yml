@@ -67,13 +67,16 @@ jobs:
           cd "$GITHUB_WORKSPACE/ios"
           WORKSPACE=$(find . -maxdepth 1 -name "*.xcworkspace" | head -1)
           if [ -z "$WORKSPACE" ]; then echo "ERROR: no .xcworkspace (pod install failed?)"; ls -la; exit 1; fi
-          SCHEME=$(xcodebuild -list -workspace "$WORKSPACE" 2>/dev/null \
-            | awk '/Schemes:/{f=1;next} f&&NF{print $1; exit}')
+          # 用 .xcodeproj 基名作为 scheme（Expo 生成的 app scheme=项目名），
+          # 不能用 xcodebuild -list 取第一个 scheme，否则会误选 Pods 的 boost 资源包 scheme。
+          SCHEME=$(ls *.xcodeproj 2>/dev/null | head -1 | sed 's#.*/##; s/.xcodeproj$//')
           if [ -z "$SCHEME" ]; then echo "ERROR: could not detect scheme"; xcodebuild -list -workspace "$WORKSPACE"; exit 1; fi
           echo "WORKSPACE=$WORKSPACE SCHEME=$SCHEME"
           xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" \
             -configuration Release clean archive \
-            -archivePath "$RUNNER_TEMP/build.xcarchive" CODE_SIGNING_ALLOWED=NO
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/build.xcarchive" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO
 
       - name: Package unsigned IPA
         if: steps.signcheck.outputs.available != 'true'
