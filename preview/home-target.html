@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>IDCOPS iOS · 目标视觉预览（对齐小程序首页）</title>
+<style>
+  :root{
+    --accent:#1d6bff;
+    --accent2:#2e90fa;
+    --bg:#f5f7fa;
+    --surface:#ffffff;
+    --text1:#101828;
+    --text2:#5b6573;
+    --text3:#98a2b3;
+    --border:#e6e9ef;
+    --ok:#12b76a;
+    --warn:#f79009;
+    --danger:#f04438;
+    --purple:#7c3aed;
+    --radius:16px;
+    --shadow:0 4px 16px rgba(16,24,40,.06);
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-font-smoothing:antialiased;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue",sans-serif;
+    background:linear-gradient(135deg,#1b2440,#0b1224);
+    min-height:100vh;display:flex;align-items:center;justify-content:center;
+    padding:32px 16px;gap:40px;flex-wrap:wrap;
+  }
+  .stage-label{color:#cdd6f4;font-size:13px;letter-spacing:2px;text-align:center;width:100%;order:-1;opacity:.7;}
+
+  /* 手机框 */
+  .phone{
+    width:390px;height:844px;background:#000;border-radius:46px;padding:12px;
+    box-shadow:0 30px 80px rgba(0,0,0,.5);position:relative;flex:none;
+  }
+  .screen{
+    width:100%;height:100%;background:var(--bg);border-radius:36px;overflow:hidden;
+    position:relative;display:flex;flex-direction:column;
+  }
+  .island{position:absolute;top:10px;left:50%;transform:translateX(-50%);width:120px;height:30px;background:#000;border-radius:18px;z-index:20;}
+  .statusbar{height:46px;display:flex;align-items:center;justify-content:space-between;padding:0 26px;font-size:13px;font-weight:600;color:var(--text1);}
+  .scroll{flex:1;overflow-y:auto;padding:0 16px 28px;}
+  .scroll::-webkit-scrollbar{display:none;}
+
+  /* 顶栏 */
+  .topbar{display:flex;align-items:center;justify-content:space-between;padding:4px 4px 14px;}
+  .room-pill{display:flex;align-items:center;gap:7px;background:#fff;border:1px solid var(--border);border-radius:999px;padding:7px 13px;box-shadow:var(--shadow);}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 3px rgba(18,183,106,.18);}
+  .room-name{font-size:13px;font-weight:600;color:var(--text1);}
+  .room-on{font-size:11px;color:var(--ok);font-weight:600;}
+  .greet{font-size:13px;color:var(--text2);}
+
+  /* 扫描 hero */
+  .hero{background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:18px;padding:16px;display:flex;align-items:center;gap:14px;color:#fff;box-shadow:0 8px 22px rgba(29,107,255,.35);}
+  .hero-ic{width:46px;height:46px;border-radius:13px;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;font-size:22px;}
+  .hero-t{font-size:17px;font-weight:700;}
+  .hero-s{font-size:12px;opacity:.85;margin-top:2px;}
+  .hero-arrow{margin-left:auto;font-size:22px;opacity:.8;}
+
+  /* 统计网格 */
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px;}
+  .stat{background:var(--surface);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow);}
+  .s-ic{width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;margin-bottom:10px;}
+  .s-label{font-size:12px;color:var(--text2);}
+  .s-val{font-size:24px;font-weight:800;color:var(--text1);line-height:1.15;margin-top:1px;}
+  .s-sub{font-size:10.5px;color:var(--text3);margin-top:3px;}
+  .bar{height:5px;border-radius:4px;background:#eef1f6;margin-top:9px;overflow:hidden;}
+  .bar>i{display:block;height:100%;border-radius:4px;background:linear-gradient(90deg,#5ce0a8,var(--ok));}
+
+  /* 入口卡 */
+  .entry{background:var(--surface);border-radius:var(--radius);padding:14px;display:flex;align-items:center;gap:13px;margin-top:12px;box-shadow:var(--shadow);}
+  .e-ic{width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,var(--accent2),var(--accent));color:#fff;display:flex;align-items:center;justify-content:center;font-size:19px;flex:none;}
+  .e-t{font-size:15px;font-weight:700;color:var(--text1);}
+  .e-s{font-size:11.5px;color:var(--text3);margin-top:2px;}
+  .e-arrow{margin-left:auto;font-size:20px;color:var(--text3);}
+
+  /* 客户卡 */
+  .card{background:var(--surface);border-radius:var(--radius);padding:16px;margin-top:12px;box-shadow:var(--shadow);}
+  .c-title{font-size:15px;font-weight:700;color:var(--text1);display:flex;align-items:center;gap:8px;margin-bottom:12px;}
+  .c-title::before{content:"";width:4px;height:15px;border-radius:3px;background:var(--accent);}
+  .chips{display:flex;gap:7px;margin-bottom:10px;flex-wrap:wrap;}
+  .chip{font-size:11px;font-weight:600;padding:4px 9px;border-radius:999px;}
+  .chip.b{background:rgba(29,107,255,.12);color:var(--accent);}
+  .chip.p{background:rgba(124,58,237,.12);color:var(--purple);}
+  .chip.g{background:rgba(18,183,106,.12);color:var(--ok);}
+  .c-row{display:flex;align-items:center;padding:10px 0;border-top:1px solid #f1f3f7;}
+  .c-name{font-size:14px;font-weight:600;color:var(--text1);}
+  .c-nums{margin-left:auto;display:flex;gap:12px;font-size:11.5px;color:var(--text3);}
+  .c-nums b{color:var(--text1);font-weight:700;}
+
+  /* 图表 */
+  .chart{display:flex;align-items:flex-end;gap:9px;height:90px;margin:6px 2px 4px;overflow:hidden;}
+  .col{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;}
+  .pair{display:flex;gap:3px;align-items:flex-end;height:70px;}
+  .up,.down{width:7px;border-radius:3px;}
+  .up{background:var(--accent);}
+  .down{background:#cdd6e6;}
+  .clabel{font-size:9px;color:var(--text3);}
+  .legend{display:flex;gap:16px;font-size:11px;color:var(--text2);margin-top:4px;}
+  .legend i{font-style:normal;}
+  .lg-up{color:var(--accent);} .lg-down{color:#9aa6bd;}
+
+  /* 操作流 */
+  .act{display:flex;gap:11px;padding:11px 0;border-top:1px solid #f1f3f7;}
+  .act:first-of-type{border-top:none;}
+  .kbadge{font-size:10.5px;font-weight:700;padding:3px 8px;border-radius:7px;height:fit-content;flex:none;}
+  .k-mount{background:rgba(18,183,106,.12);color:var(--ok);}
+  .k-in{background:rgba(29,107,255,.12);color:var(--accent);}
+  .k-out{background:rgba(247,144,9,.14);color:var(--warn);}
+  .a-desc{font-size:13px;color:var(--text1);font-weight:500;}
+  .a-meta{font-size:11px;color:var(--text3);margin-top:3px;}
+  .a-meta b{color:var(--text2);font-weight:600;}
+
+  .footnote{width:300px;color:#cdd6f4;font-size:12.5px;line-height:1.7;}
+  .footnote h3{color:#fff;font-size:15px;margin-bottom:10px;}
+  .footnote li{margin:6px 0 6px 16px;}
+  .footnote .k{color:#8ab4ff;font-weight:600;}
+</style>
+</head>
+<body>
+  <div class="stage-label">IDCOPS · iOS 目标视觉（对齐小程序首页 · 非最终像素稿）</div>
+
+  <div class="phone">
+    <div class="island"></div>
+    <div class="screen">
+      <div class="statusbar"><span>9:41</span><span>📶 🔋</span></div>
+      <div class="scroll">
+        <!-- 顶栏 -->
+        <div class="topbar">
+          <div class="room-pill"><span class="dot"></span><span class="room-name">北京机房</span><span class="room-on">在线</span></div>
+          <div class="greet">下午好，陈工</div>
+        </div>
+
+        <!-- 扫描 hero -->
+        <div class="hero">
+          <div class="hero-ic">📷</div>
+          <div><div class="hero-t">扫一扫</div><div class="hero-s">入库 / 出库 / 查询设备</div></div>
+          <div class="hero-arrow">›</div>
+        </div>
+
+        <!-- 统计网格 -->
+        <div class="grid">
+          <div class="stat">
+            <div class="s-ic" style="background:linear-gradient(135deg,#5aa9ff,#1d6bff)">🖥️</div>
+            <div class="s-label">设备总数</div>
+            <div class="s-val">1,284</div>
+            <div class="s-sub">服务器 860 · 网络 240</div>
+          </div>
+          <div class="stat">
+            <div class="s-ic" style="background:linear-gradient(135deg,#5ce0a8,#12b76a)">🗄️</div>
+            <div class="s-label">机柜总数</div>
+            <div class="s-val">312</div>
+            <div class="s-sub">已用 248 · 空闲 64</div>
+            <div class="bar"><i style="width:79%"></i></div>
+          </div>
+          <div class="stat">
+            <div class="s-ic" style="background:linear-gradient(135deg,#fbc17d,#f79009)">👥</div>
+            <div class="s-label">客户数量</div>
+            <div class="s-val">36</div>
+            <div class="s-sub">独立 22 · 散户 14</div>
+          </div>
+          <div class="stat">
+            <div class="s-ic" style="background:linear-gradient(135deg,#b6a4fb,#7c3aed)">📦</div>
+            <div class="s-label">库存数量</div>
+            <div class="s-val">572</div>
+            <div class="s-sub">件在库物品</div>
+          </div>
+        </div>
+
+        <!-- 授权工单入口 -->
+        <div class="entry">
+          <div class="e-ic">📝</div>
+          <div><div class="e-t">授权工单</div><div class="e-s">客户授权我们对设备的操作留痕</div></div>
+          <div class="e-arrow">›</div>
+        </div>
+
+        <!-- 客户维度明细 -->
+        <div class="card">
+          <div class="c-title">客户维度明细</div>
+          <div class="chips">
+            <span class="chip b">18 客户设备</span>
+            <span class="chip p">9 客户机柜</span>
+            <span class="chip g">24 客户库存</span>
+          </div>
+          <div class="c-row"><span class="c-name">腾讯云计算</span><span class="c-nums">设备 <b>420</b> 机柜 <b>96</b> 库存 <b>180</b></span></div>
+          <div class="c-row"><span class="c-name">字节跳动</span><span class="c-nums">设备 <b>312</b> 机柜 <b>74</b> 库存 <b>120</b></span></div>
+          <div class="c-row"><span class="c-name">阿里云</span><span class="c-nums">设备 <b>268</b> 机柜 <b>60</b> 库存 <b>90</b></span></div>
+        </div>
+
+        <!-- 图表 -->
+        <div class="card">
+          <div class="c-title">客户上下架（近 12 月）</div>
+          <div class="chart">
+            <div class="col"><div class="pair"><div class="up" style="height:40px"></div><div class="down" style="height:14px"></div></div><div class="clabel">1月</div></div>
+            <div class="col"><div class="pair"><div class="up" style="height:52px"></div><div class="down" style="height:18px"></div></div><div class="clabel">2月</div></div>
+            <div class="col"><div class="pair"><div class="up" style="height:34px"></div><div class="down" style="height:22px"></div></div><div class="clabel">3月</div></div>
+            <div class="col"><div class="pair"><div class="up" style="height:60px"></div><div class="down" style="height:12px"></div></div><div class="clabel">4月</div></div>
+            <div class="col"><div class="pair"><div class="up" style="height:46px"></div><div class="down" style="height:20px"></div></div><div class="clabel">5月</div></div>
+            <div class="col"><div class="pair"><div class="up" style="height:55px"></div><div class="down" style="height:16px"></div></div><div class="clabel">6月</div></div>
+            <div class="col"><div class="pair"><div class="up" style="height:38px"></div><div class="down" style="height:24px"></div></div><div class="clabel">7月</div></div>
+            <div class="col"><div class="pair"><div class="up" style="height:50px"></div><div class="down" style="height:15px"></div></div><div class="clabel">8月</div></div>
+          </div>
+          <div class="legend"><span class="lg-up">■ 上架 1,284</span><span class="lg-down">■ 下架 642</span></div>
+        </div>
+
+        <!-- 操作记录 -->
+        <div class="card">
+          <div class="c-title">操作记录</div>
+          <div class="act"><span class="kbadge k-mount">上架</span><div><div class="a-desc">服务器 RACK-A07-U12 上架</div><div class="a-meta"><b>陈工</b> · 2 台 · 14:02</div></div></div>
+          <div class="act"><span class="kbadge k-in">入库</span><div><div class="a-desc">光模块 40G ×50 入库</div><div class="a-meta"><b>李工</b> · 50 件 · 13:40</div></div></div>
+          <div class="act"><span class="kbadge k-out">出库</span><div><div class="a-desc">跳线 LC-LC ×20 出库</div><div class="a-meta"><b>王工</b> · 20 件 · 11:18</div></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footnote">
+    <h3>这版预览在还原什么</h3>
+    <ul>
+      <li><span class="k">配色同源</span>：强调色 #1d6bff、白卡片、浅灰底，与小程序完全一致</li>
+      <li><span class="k">卡片体系</span>：渐变图标方块 + 大数值 + 进度条，替代现在的纯文字列表</li>
+      <li><span class="k">首页仪表盘</span>：2 列统计卡、授权工单入口、客户明细、近 12 月上/下架柱状图、操作流</li>
+      <li><span class="k">组件化</span>：以上会沉淀进 <code>ui.tsx</code>（StatCard / HeroCard / 图表等），其它页面复用同一套</li>
+    </ul>
+    <p style="margin-top:12px;opacity:.8">下一步：你确认这个方向，我就改 <code>theme.ts</code> + <code>ui.tsx</code>，并把首页/机房列表等页面套上去，重新出 IPA 给你看真机效果。</p>
+  </div>
+</body>
+</html>

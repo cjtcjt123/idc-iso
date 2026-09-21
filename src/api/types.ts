@@ -220,3 +220,57 @@ export interface AuditLog {
   ipAddress?: string;
   createdAt?: string;
 }
+
+// ── 首页仪表盘聚合（GET /stats/dashboard?roomId，对齐小程序 DashboardStats）──
+export interface CustomerDeviceStat {
+  customerId: string;
+  name: string;
+  total: number;
+  server: number;
+  network: number;
+  other: number;
+}
+export interface CustomerRackStat {
+  customerId: string;
+  name: string;
+  usedRacks: number;
+}
+export interface CustomerInventoryStat {
+  customerId: string;
+  name: string;
+  quantity: number;
+}
+export interface MonthlyLifecycle {
+  key: string; // YYYY-MM
+  label: string; // 如 "8月"
+  mount: number;
+  dismount: number;
+}
+export interface DashboardStats {
+  devices: {
+    total: number;
+    server: number;
+    network: number;
+    other: number;
+    byCustomer: CustomerDeviceStat[];
+  };
+  racks: {
+    total: number;
+    used: number;
+    unused: number;
+    uUsed: number;
+    uTotal: number;
+    utilization: number; // 0-100
+    byCustomer: CustomerRackStat[];
+  };
+  customers: {
+    total: number;
+    individual: number;
+    retail: number;
+  };
+  inventory: {
+    total: number;
+    byCustomer: CustomerInventoryStat[];
+  };
+  lifecycle: MonthlyLifecycle[];
+}

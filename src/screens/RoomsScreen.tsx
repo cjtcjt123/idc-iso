@@ -2,7 +2,8 @@ import React, { useEffect, useState } from "react";
 import { FlatList, RefreshControl, View } from "react-native";
 import { apiList } from "../api/client";
 import type { Room } from "../api/types";
-import { Badge, Card, EmptyState, ListRow, Loading } from "../components/ui";
+import { Badge, CardRow, EmptyState, Loading } from "../components/ui";
+import { theme } from "../theme";
 
 export function RoomsScreen({ navigation }: any) {
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -31,9 +32,11 @@ export function RoomsScreen({ navigation }: any) {
         data={rooms}
         keyExtractor={(r) => r.id}
         renderItem={({ item }) => (
-          <ListRow
+          <CardRow
+            icon="🏢"
+            colors={theme.grad.rack}
             title={item.name}
-            subtitle={item.code ? `编码 ${item.code}` : undefined}
+            subtitle={item.code ? `编码 ${item.code}` : "机房"}
             right={item.status ? <Badge label={item.status} /> : undefined}
             onPress={() =>
               navigation.navigate("RoomDetail", { roomId: item.id, roomName: item.name })

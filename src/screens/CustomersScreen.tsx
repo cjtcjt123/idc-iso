@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { FlatList, RefreshControl, Text, TouchableOpacity, View } from "react-native";
 import { apiList } from "../api/client";
 import type { Customer } from "../api/types";
-import { EmptyState, ListRow, Loading } from "../components/ui";
+import { CardRow, EmptyState, Loading } from "../components/ui";
 import { theme } from "../theme";
 
 export function CustomersScreen({ navigation }: any) {
@@ -42,7 +42,9 @@ export function CustomersScreen({ navigation }: any) {
         data={customers}
         keyExtractor={(c) => c.id}
         renderItem={({ item }) => (
-          <ListRow
+          <CardRow
+            icon="👥"
+            colors={theme.grad.customer}
             title={item.name}
             subtitle={[item.type, item.contact].filter(Boolean).join(" · ")}
             onPress={() => navigation.navigate("CustomerDetail", { customerId: item.id })}

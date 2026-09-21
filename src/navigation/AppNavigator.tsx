@@ -6,6 +6,7 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { useAuth } from "../auth/AuthContext";
 import { LoginScreen } from "../screens/LoginScreen";
 import { RoomsScreen } from "../screens/RoomsScreen";
+import { DashboardScreen } from "../screens/DashboardScreen";
 import { RoomDetailScreen } from "../screens/RoomDetailScreen";
 import { RackDetailScreen } from "../screens/RackDetailScreen";
 import { DevicesScreen } from "../screens/DevicesScreen";
@@ -30,6 +31,7 @@ const Tab = createBottomTabNavigator();
 
 function IconTab({ name, color }: { name: string; color: string }) {
   const glyph: Record<string, string> = {
+    首页: "⌂",
     机房: "▦",
     设备: "⬚",
     库存: "▤",
@@ -37,6 +39,14 @@ function IconTab({ name, color }: { name: string; color: string }) {
     我的: "◍",
   };
   return <Text style={{ fontSize: 22, color }}>{glyph[name] || "•"}</Text>;
+}
+
+function DashboardStack() {
+  return (
+    <Stack.Navigator>
+      <Stack.Screen name="Dashboard" component={DashboardScreen} options={{ title: "首页" }} />
+    </Stack.Navigator>
+  );
 }
 
 function RoomsStack() {
@@ -119,6 +129,7 @@ function Tabs() {
         headerShown: true,
       }}
     >
+      <Tab.Screen name="首页Tab" component={DashboardStack} options={{ title: "首页", tabBarIcon: ({ color }) => <IconTab name="首页" color={color} /> }} />
       <Tab.Screen name="机房Tab" component={RoomsStack} options={{ title: "机房", tabBarIcon: ({ color }) => <IconTab name="机房" color={color} /> }} />
       <Tab.Screen name="设备Tab" component={DevicesStack} options={{ title: "设备", tabBarIcon: ({ color }) => <IconTab name="设备" color={color} /> }} />
       <Tab.Screen name="库存Tab" component={InventoryStack} options={{ title: "库存", tabBarIcon: ({ color }) => <IconTab name="库存" color={color} /> }} />

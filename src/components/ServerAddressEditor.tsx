@@ -1,7 +1,12 @@
 import React, { useRef, useState } from "react";
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { baseUrlStorage } from "../storage";
-import { CONFIG_PASSKEY, DEFAULT_BASE_URL, isAllowedBaseUrl } from "../config";
+import {
+  CONFIG_PASSKEY,
+  DEFAULT_BASE_URL,
+  isAllowedBaseUrl,
+  normalizeBaseUrl,
+} from "../config";
 import { Button, Card, Input } from "./ui";
 
 /** 连点解锁所需的点击次数与有效时间窗（与小程序一致） */
@@ -60,7 +65,8 @@ export function ServerAddressEditor({ trigger }: { trigger: React.ReactNode }) {
   };
 
   const save = async () => {
-    const url = value.trim();
+    // 归一化：去掉结尾斜杠、剥掉误填的 /api 或 /api/v1 后缀（本端会自动追加 /api/v1）
+    const url = normalizeBaseUrl(value);
     if (!url) {
       Alert.alert("地址不能为空");
       return;
@@ -76,7 +82,7 @@ export function ServerAddressEditor({ trigger }: { trigger: React.ReactNode }) {
       );
       return;
     }
-    await baseUrlStorage.save(url.replace(/\/+$/, ""));
+    await baseUrlStorage.save(url);
     setEditing(false);
     Alert.alert("已保存", `后端地址：${url}`);
   };
@@ -95,11 +101,13 @@ export function ServerAddressEditor({ trigger }: { trigger: React.ReactNode }) {
       {unlocked && editing ? (
         <Card>
           <Input
-            placeholder="http://IP:3000"
+            placeholder="http://IP:8082"
             value={value}
             onChangeText={setValue}
           />
-          <Text style={styles.hint}>默认地址：{DEFAULT_BASE_URL}</Text>
+          <Text style={styles.hint}>
+            只填「http://IP:端口」，不要带 /api/v1（会自动补）。默认：{DEFAULT_BASE_URL}
+          </Text>
           <Button label="保存地址" onPress={save} />
           <View style={{ height: 10 }} />
           <Button label="恢复默认地址" onPress={reset} />

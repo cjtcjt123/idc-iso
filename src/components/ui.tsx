@@ -7,7 +7,277 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 import { theme } from "../theme";
+
+/* ───────────────────────── 渐变背景（用已装的 react-native-svg，零新依赖）───────────────────────── */
+export function GradientView({
+  colors,
+  style,
+  children,
+  radius = 0,
+}: {
+  colors: readonly [string, string];
+  style?: any;
+  children?: React.ReactNode;
+  radius?: number;
+}) {
+  const gid = React.useId().replace(/:/g, "");
+  return (
+    <View style={[styles.gradWrap, { borderRadius: radius }, style]}>
+      <Svg style={StyleSheet.absoluteFill} width="100%" height="100%" preserveAspectRatio="none">
+        <Defs>
+          <LinearGradient id={gid} x1="0%" y1="0%" x2="100%" y2="100%">
+            <Stop offset="0%" stopColor={colors[0]} />
+            <Stop offset="100%" stopColor={colors[1]} />
+          </LinearGradient>
+        </Defs>
+        <Rect x="0" y="0" width="100%" height="100%" fill={`url(#${gid})`} />
+      </Svg>
+      <View style={[StyleSheet.absoluteFill, styles.gradCenter]}>{children}</View>
+    </View>
+  );
+}
+
+/* 渐变图标方块 */
+export function IconChip({
+  icon,
+  colors,
+  size = 40,
+  radius = 12,
+}: {
+  icon: string;
+  colors: readonly [string, string];
+  size?: number;
+  radius?: number;
+}) {
+  return (
+    <GradientView colors={colors} radius={radius} style={{ width: size, height: size }}>
+      <Text style={{ fontSize: size * 0.46, textAlign: "center" }}>{icon}</Text>
+    </GradientView>
+  );
+}
+
+/* 统计卡：渐变图标 + 标签 + 大数值 + 副文 + 可选进度条 */
+export function StatCard({
+  icon,
+  colors,
+  label,
+  value,
+  sub,
+  bar,
+  onPress,
+}: {
+  icon: string;
+  colors: readonly [string, string];
+  label: string;
+  value: string;
+  sub?: string;
+  bar?: number; // 0-100
+  onPress?: () => void;
+}) {
+  const body = (
+    <View style={styles.statCard}>
+      <IconChip icon={icon} colors={colors} size={40} radius={12} />
+      <Text style={styles.statLabel}>{label}</Text>
+      <Text style={styles.statValue}>{value}</Text>
+      {sub ? <Text style={styles.statSub}>{sub}</Text> : null}
+      {bar !== undefined ? <ProgressBar percent={bar} colors={colors} /> : null}
+    </View>
+  );
+  return onPress ? (
+    <TouchableOpacity activeOpacity={0.9}>{body}</TouchableOpacity>
+  ) : (
+    body
+  );
+}
+
+/* 全宽渐变 hero（扫一扫等入口） */
+export function HeroCard({
+  icon,
+  title,
+  subtitle,
+  onPress,
+}: {
+  icon: string;
+  title: string;
+  subtitle: string;
+  onPress?: () => void;
+}) {
+  const body = (
+    <GradientView colors={theme.grad.hero} radius={theme.r} style={styles.hero}>
+      <View style={styles.heroIcon}>
+        <Text style={{ fontSize: 22 }}>{icon}</Text>
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.heroTitle}>{title}</Text>
+        <Text style={styles.heroSub}>{subtitle}</Text>
+      </View>
+      <Text style={styles.heroArrow}>›</Text>
+    </GradientView>
+  );
+  return onPress ? (
+    <TouchableOpacity activeOpacity={0.92} onPress={onPress}>
+      {body}
+    </TouchableOpacity>
+  ) : (
+    body
+  );
+}
+
+/* 带左侧强调竖条的区块卡（标题 + 内容） */
+export function SectionCard({
+  title,
+  right,
+  children,
+}: {
+  title: string;
+  right?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <View style={styles.sectionCard}>
+      <View style={styles.sectionHead}>
+        <View style={styles.sectionBar} />
+        <Text style={styles.sectionTitle}>{title}</Text>
+        {right}
+      </View>
+      {children}
+    </View>
+  );
+}
+
+/* 进度条 */
+export function ProgressBar({
+  percent,
+  colors,
+}: {
+  percent: number;
+  colors?: readonly [string, string];
+}) {
+  const p = Math.max(0, Math.min(100, Math.round(percent)));
+  const fill = colors ? colors[1] : theme.ok;
+  return (
+    <View style={styles.bar}>
+      <View style={[styles.barFill, { width: `${p}%`, backgroundColor: fill }]} />
+    </View>
+  );
+}
+
+/* 近 12 月上下架双柱图（对齐预览 .chart） */
+export function MiniBarChart({ data }: { data: { label: string; mount: number; dismount: number }[] }) {
+  const max = Math.max(1, ...data.map((d) => Math.max(d.mount, d.dismount)));
+  return (
+    <View style={styles.chart}>
+      {data.map((d, i) => (
+        <View key={i} style={styles.chartCol}>
+          <View style={styles.chartPair}>
+            <View style={[styles.chartBarUp, { height: (d.mount / max) * 56 }]} />
+            <View style={[styles.chartBarDown, { height: (d.dismount / max) * 56 }]} />
+          </View>
+          <Text style={styles.chartLabel}>{d.label}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+/* 操作记录行 */
+export const ACTIVITY_LABEL: Record<string, string> = {
+  mat: "物料",
+  "dev-in": "入库",
+  "dev-out": "出库",
+  "dev-mount": "上架",
+  "dev-dismount": "下架",
+  audit: "审计",
+};
+const ACTIVITY_TINT: Record<string, { fg: string; bg: string }> = {
+  "dev-mount": { fg: theme.ok, bg: theme.okSoft },
+  "dev-in": { fg: theme.info, bg: theme.infoSoft },
+  "dev-out": { fg: theme.warn, bg: theme.warnSoft },
+  "dev-dismount": { fg: theme.danger2, bg: theme.dangerSoft },
+  mat: { fg: theme.purple, bg: theme.purpleSoft },
+  audit: { fg: theme.text2, bg: theme.accentSoft },
+};
+
+export function ActivityRow({
+  kind,
+  desc,
+  meta,
+}: {
+  kind?: string;
+  desc: string;
+  meta?: string;
+}) {
+  const tint = (kind && ACTIVITY_TINT[kind]) || ACTIVITY_TINT.mat;
+  const label = (kind && ACTIVITY_LABEL[kind]) || kind || "记录";
+  return (
+    <View style={styles.actRow}>
+      <View style={[styles.kBadge, { backgroundColor: tint.bg }]}>
+        <Text style={[styles.kBadgeText, { color: tint.fg }]}>{label}</Text>
+      </View>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text style={styles.actDesc} numberOfLines={1}>
+          {desc}
+        </Text>
+        {meta ? <Text style={styles.actMeta}>{meta}</Text> : null}
+      </View>
+    </View>
+  );
+}
+
+/* 顶栏机房胶囊 */
+export function RoomPill({ name, online = true }: { name: string; online?: boolean }) {
+  return (
+    <View style={styles.roomPill}>
+      <View style={[styles.dot, online ? styles.dotOn : null]} />
+      <Text style={styles.roomName}>{name}</Text>
+    </View>
+  );
+}
+
+/* 列表行卡片：渐变图标 + 标题 + 副文 + 右侧徽章 + 箭头 */
+export function CardRow({
+  icon,
+  colors,
+  title,
+  subtitle,
+  right,
+  onPress,
+}: {
+  icon?: string;
+  colors?: readonly [string, string];
+  title: string;
+  subtitle?: string;
+  right?: React.ReactNode;
+  onPress?: () => void;
+}) {
+  const body = (
+    <View style={styles.cardRow}>
+      {icon && colors ? <IconChip icon={icon} colors={colors} size={38} radius={11} /> : null}
+      <View style={{ flex: 1, marginLeft: icon ? 12 : 0, minWidth: 0 }}>
+        <Text style={styles.rowTitle} numberOfLines={1}>
+          {title}
+        </Text>
+        {subtitle ? (
+          <Text style={styles.rowSub} numberOfLines={1}>
+            {subtitle}
+          </Text>
+        ) : null}
+      </View>
+      {right}
+      <Text style={styles.chevron}>›</Text>
+    </View>
+  );
+  if (onPress) {
+    return (
+      <TouchableOpacity activeOpacity={0.85} onPress={onPress}>
+        <Card>{body}</Card>
+      </TouchableOpacity>
+    );
+  }
+  return <Card>{body}</Card>;
+}
 
 export function ScreenHeader({ title, right }: { title: string; right?: React.ReactNode }) {
   return (
@@ -190,4 +460,80 @@ const styles = StyleSheet.create({
   empty: { padding: 40, alignItems: "center" },
   emptyText: { color: theme.text3, fontSize: 14 },
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 40 },
+
+  /* ── 渐变 / 组件库 ── */
+  gradWrap: { overflow: "hidden", position: "relative" },
+  gradCenter: { alignItems: "center", justifyContent: "center" },
+  statCard: {
+    backgroundColor: theme.surface,
+    borderRadius: theme.r,
+    padding: 14,
+    shadowColor: "#101828",
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
+    flex: 1,
+    margin: 6,
+  },
+  statLabel: { fontSize: 12, color: theme.text2, marginTop: 10 },
+  statValue: { fontSize: 24, fontWeight: "800", color: theme.text1, lineHeight: 28, marginTop: 1 },
+  statSub: { fontSize: 10.5, color: theme.text3, marginTop: 3 },
+  hero: { flexDirection: "row", alignItems: "center", padding: 16, gap: 14 },
+  heroIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: 13,
+    backgroundColor: "rgba(255,255,255,0.18)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  heroTitle: { fontSize: 17, fontWeight: "700", color: "#fff" },
+  heroSub: { fontSize: 12, color: "#fff", opacity: 0.85, marginTop: 2 },
+  heroArrow: { fontSize: 22, color: "#fff", opacity: 0.8, marginLeft: 6 },
+  sectionCard: {
+    backgroundColor: theme.surface,
+    borderRadius: theme.r,
+    padding: 16,
+    marginTop: 12,
+    shadowColor: "#101828",
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
+  },
+  sectionHead: { flexDirection: "row", alignItems: "center", marginBottom: 12 },
+  sectionBar: { width: 4, height: 15, borderRadius: 3, backgroundColor: theme.accent, marginRight: 8 },
+  sectionTitle: { fontSize: 15, fontWeight: "700", color: theme.text1, flex: 1 },
+  bar: { height: 5, borderRadius: 4, backgroundColor: theme.track, marginTop: 9, overflow: "hidden" },
+  barFill: { height: "100%", borderRadius: 4 },
+  chart: { flexDirection: "row", alignItems: "flex-end", gap: 6, height: 76, marginTop: 6 },
+  chartCol: { flex: 1, alignItems: "center", gap: 3 },
+  chartPair: { flexDirection: "row", alignItems: "flex-end", gap: 3, height: 58 },
+  chartBarUp: { width: 7, borderRadius: 3, backgroundColor: theme.accent },
+  chartBarDown: { width: 7, borderRadius: 3, backgroundColor: "#cdd6e6" },
+  chartLabel: { fontSize: 9, color: theme.text3 },
+  actRow: { flexDirection: "row", alignItems: "flex-start", gap: 11, paddingVertical: 11, borderTopWidth: 1, borderColor: "#f1f3f7" },
+  kBadge: { paddingVertical: 3, paddingHorizontal: 8, borderRadius: 7, alignSelf: "flex-start" },
+  kBadgeText: { fontSize: 10.5, fontWeight: "700" },
+  actDesc: { fontSize: 13, fontWeight: "500", color: theme.text1 },
+  actMeta: { fontSize: 11, color: theme.text3, marginTop: 3 },
+  roomPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    backgroundColor: theme.surface,
+    borderRadius: theme.rPill,
+    paddingVertical: 7,
+    paddingHorizontal: 13,
+    shadowColor: "#101828",
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: theme.text3 },
+  dotOn: { backgroundColor: theme.ok, shadowColor: theme.ok, shadowOpacity: 0.3, shadowRadius: 4, shadowOffset: { width: 0, height: 0 } },
+  roomName: { fontSize: 13, fontWeight: "600", color: theme.text1 },
+  cardRow: { flexDirection: "row", alignItems: "center", gap: 4 },
 });

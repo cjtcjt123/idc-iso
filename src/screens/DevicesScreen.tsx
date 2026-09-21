@@ -3,7 +3,8 @@ import { FlatList, RefreshControl, View } from "react-native";
 import { apiList } from "../api/client";
 import type { Device } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
-import { Badge, Card, EmptyState, ListRow, Loading } from "../components/ui";
+import { Badge, Card, CardRow, EmptyState, ListRow, Loading } from "../components/ui";
+import { theme } from "../theme";
 
 const PLACEMENT_LABEL: Record<string, string> = {
   mounted: "已上架",
@@ -55,7 +56,9 @@ export function DevicesScreen({ navigation }: any) {
         data={devices}
         keyExtractor={(d) => d.id}
         renderItem={({ item }) => (
-          <ListRow
+          <CardRow
+            icon="🖥️"
+            colors={theme.grad.device}
             title={item.name || item.sn || "未命名设备"}
             subtitle={[item.brand, item.model].filter(Boolean).join(" ") || item.type}
             right={

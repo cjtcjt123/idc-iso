@@ -14,6 +14,18 @@ export const CONFIG_PASSKEY = "chenjingtao";
 export const ALLOW_SERVER_SWITCH = true;
 
 /**
+ * 归一化服务器地址：
+ * - 去掉首尾空白与结尾斜杠；
+ * - 容错去掉用户误填的 `/api`、`/api/v1` 后缀（对齐小程序「地址自带 /api/v1」的习惯）。
+ *   本端由 api/client.ts 统一追加 API_PREFIX，若不剥掉会拼成 /api/v1/api/v1/... 导致接口 404。
+ */
+export function normalizeBaseUrl(raw: string): string {
+  let s = (raw || "").trim().replace(/\/+$/, "");
+  s = s.replace(/\/api(\/v\d+)?$/i, ""); // 剥掉 /api 或 /api/vN
+  return s.replace(/\/+$/, "");
+}
+
+/**
  * 校验 baseUrl 是否允许作为 API 基地址（与小程序同源逻辑）。
  * 放行范围：①本机/内网（http 允许）；②公网 IPv4（http/https 均可，用于 frp 纯 IP 直连、未备案域名场景）；
  * ③公网域名强制 https（避免明文 token 经公网被嗅探）。

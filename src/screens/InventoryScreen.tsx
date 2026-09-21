@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { FlatList, RefreshControl, Text, TouchableOpacity, View } from "react-native";
 import { apiList } from "../api/client";
 import type { InventoryInstance } from "../api/types";
-import { Badge, EmptyState, ListRow, Loading } from "../components/ui";
+import { Badge, CardRow, EmptyState, Loading } from "../components/ui";
 import { theme } from "../theme";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -50,7 +50,9 @@ export function InventoryScreen({ navigation }: any) {
         data={items}
         keyExtractor={(d) => d.id}
         renderItem={({ item }) => (
-          <ListRow
+          <CardRow
+            icon="📦"
+            colors={theme.grad.inventory}
             title={item.name || item.sn || "未命名物料"}
             subtitle={[item.brand, item.model].filter(Boolean).join(" ") || item.categoryName}
             right={

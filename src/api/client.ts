@@ -1,4 +1,4 @@
-import { API_PREFIX } from "../config";
+import { API_PREFIX, normalizeBaseUrl } from "../config";
 import { baseUrlStorage, tokenStorage } from "../storage";
 import type { PaginatedResult } from "./types";
 
@@ -17,8 +17,8 @@ export class ApiError extends Error {
 }
 
 async function resolveBase(): Promise<string> {
-  const base = await baseUrlStorage.get();
-  return base.replace(/\/+$/, "");
+  // 容错：用户可能把 /api/v1 一并填进地址，先归一化再拼 API_PREFIX，避免拼成 /api/v1/api/v1/...
+  return normalizeBaseUrl(await baseUrlStorage.get());
 }
 
 async function request<T>(
