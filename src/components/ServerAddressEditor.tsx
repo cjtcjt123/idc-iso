@@ -72,7 +72,7 @@ export function ServerAddressEditor({ trigger }: { trigger: React.ReactNode }) {
     if (!isAllowedBaseUrl(url)) {
       Alert.alert(
         "地址不被允许",
-        "仅允许内网地址（10/192.168/172.16~31/100.64 段）或 https 公网域名"
+        "仅允许内网地址、公网 IP（如 http://1.2.3.4:8082），或 https 公网域名"
       );
       return;
     }
