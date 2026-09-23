@@ -1,6 +1,6 @@
 // 运行配置：默认后端地址（指向飞牛 NAS 公网入口，与小程序/web 共用同一后端）。
 // 如临时需切回本机调试，用登录页/我的页「连点图标 5 次 + 口令」应急入口改。
-export const DEFAULT_BASE_URL = "http://123.56.9.176:8082";
+export const DEFAULT_BASE_URL = "http://localhost:8099";
 export const API_PREFIX = "/api/v1";
 
 /**

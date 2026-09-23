@@ -24,3 +24,8 @@ exportOptions.plist
 
 # macOS
 .DS_Store
+
+# 本地 Expo web 预览辅助（沙箱降级 preload + 隔离 HOME，勿提交）
+.expopatch.cjs
+.exphome/
+proxy.cjs

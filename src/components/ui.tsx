@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   ActivityIndicator,
   StyleSheet,
@@ -8,6 +8,7 @@ import {
   View,
 } from "react-native";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { theme } from "../theme";
 
 /* ───────────────────────── 渐变背景（用已装的 react-native-svg，零新依赖）───────────────────────── */
@@ -332,15 +333,17 @@ export function Input({
   onChangeText,
   placeholder,
   secure,
+  style,
 }: {
   value: string;
   onChangeText: (t: string) => void;
   placeholder?: string;
   secure?: boolean;
+  style?: any;
 }) {
   return (
     <TextInput
-      style={styles.input}
+      style={[styles.input, style]}
       value={value}
       onChangeText={onChangeText}
       placeholder={placeholder}
@@ -357,17 +360,22 @@ export function Button({
   onPress,
   loading,
   danger,
+  disabled,
+  style,
 }: {
   label: string;
   onPress: () => void;
   loading?: boolean;
   danger?: boolean;
+  disabled?: boolean;
+  style?: any;
 }) {
+  const off = disabled || loading;
   return (
     <TouchableOpacity
-      style={[styles.btn, danger ? styles.btnDanger : null]}
-      onPress={onPress}
-      disabled={loading}
+      style={[styles.btn, danger ? styles.btnDanger : null, off && styles.btnDisabled, style]}
+      onPress={off ? () => {} : onPress}
+      disabled={off}
     >
       {loading ? (
         <ActivityIndicator color="#fff" />
@@ -383,6 +391,183 @@ export function EmptyState({ text }: { text: string }) {
     <View style={styles.empty}>
       <Text style={styles.emptyText}>{text}</Text>
     </View>
+  );
+}
+
+/* 搜索条（图标 + 输入 + ✕清除） */
+export function SearchBar({
+  value,
+  onChangeText,
+  placeholder,
+}: {
+  value: string;
+  onChangeText: (t: string) => void;
+  placeholder?: string;
+}) {
+  return (
+    <View style={styles.searchBar}>
+      <Text style={styles.searchIcon}>⌕</Text>
+      <TextInput
+        style={styles.searchInput}
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor={theme.text3}
+        autoCapitalize="none"
+        autoCorrect={false}
+        returnKeyType="search"
+      />
+      {value ? (
+        <TouchableOpacity onPress={() => onChangeText("")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Text style={styles.searchClear}>✕</Text>
+        </TouchableOpacity>
+      ) : null}
+    </View>
+  );
+}
+
+/* 单选 chip（on/off），可附带右侧 ▾ 表示这是下拉选择 */
+export function Chip({
+  label,
+  active,
+  onPress,
+  dropdown,
+  tone,
+}: {
+  label: string;
+  active?: boolean;
+  onPress?: () => void;
+  dropdown?: boolean;
+  tone?: "accent" | "ok" | "warn" | "neutral";
+}) {
+  const bg =
+    tone === "ok" ? theme.okSoft : tone === "warn" ? theme.warnSoft : active ? theme.accentSoft : theme.surfaceAlt;
+  const fg =
+    tone === "ok" ? theme.ok : tone === "warn" ? theme.warn : active ? theme.accent : theme.text2;
+  return (
+    <TouchableOpacity activeOpacity={0.85} onPress={onPress} style={[styles.chip, { backgroundColor: bg }]}>
+      <Text style={[styles.chipText, { color: fg }]} numberOfLines={1}>
+        {label}
+        {dropdown ? "  ▾" : ""}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
+/* 弹层：mask + sheet 主体，键盘弹出由各表单自管 */
+export function Sheet({
+  visible,
+  title,
+  onClose,
+  children,
+  scrollable,
+}: {
+  visible: boolean;
+  title?: string;
+  onClose: () => void;
+  children: React.ReactNode;
+  scrollable?: boolean;
+}) {
+  // 必须在 early return 之前调用 hook
+  const homeInset = useSafeAreaInsets().bottom;
+  if (!visible) return null;
+  const Body = scrollable ? require("react-native").ScrollView : View;
+  return (
+    <View style={styles.mask}>
+      <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={onClose} />
+      {/* 底部弹层是自己铺满整屏的层：必须加 Home 指示条留白，
+          否则 iPhone 底部操作按钮会被 Home 横条压住点不到 */}
+      <View style={[styles.sheet, { paddingBottom: homeInset + 16 }]}>
+        {title ? (
+          <View style={styles.sheetHead}>
+            <Text style={styles.sheetTitle}>{title}</Text>
+            <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Text style={styles.sheetClose}>✕</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
+        <Body style={scrollable ? styles.sheetBodyScroll : styles.sheetBody}>{children}</Body>
+      </View>
+    </View>
+  );
+}
+
+/* 分页：上一页 / 第N/M页 + pageSize ▾ / 下一页 */
+export function Pager({
+  page,
+  totalPages,
+  pageSize,
+  pageSizeOptions = [20, 30, 40],
+  onPrev,
+  onNext,
+  onPageSize,
+}: {
+  page: number;
+  totalPages: number;
+  pageSize: number;
+  pageSizeOptions?: number[];
+  onPrev: () => void;
+  onNext: () => void;
+  onPageSize?: (n: number) => void;
+}) {
+  const [pickerOpen, setPickerOpen] = useState(false);
+  return (
+    <View style={styles.pager}>
+      <TouchableOpacity onPress={onPrev} disabled={page <= 1} style={[styles.pgBtn, page <= 1 && styles.pgBtnDis]}>
+        <Text style={[styles.pgBtnText, page <= 1 && styles.pgBtnTextDis]}>上一页</Text>
+      </TouchableOpacity>
+      <View style={styles.pgMid}>
+        <Text style={styles.pgInfo}>第 {page}/{totalPages} 页</Text>
+        {onPageSize ? (
+          <View>
+            <TouchableOpacity onPress={() => setPickerOpen((v) => !v)} style={styles.pgSizeBtn}>
+              <Text style={styles.pgSizeText}>{pageSize} 条 ▾</Text>
+            </TouchableOpacity>
+            {pickerOpen ? (
+              <View style={styles.pgSizePop}>
+                {pageSizeOptions.map((n) => (
+                  <TouchableOpacity
+                    key={n}
+                    onPress={() => {
+                      onPageSize(n);
+                      setPickerOpen(false);
+                    }}
+                    style={styles.pgSizeItem}
+                  >
+                    <Text style={[styles.pgSizeItemText, n === pageSize && styles.pgSizeItemTextOn]}>{n} 条/页</Text>
+                  </TouchableOpacity>
+                ))}
+                <TouchableOpacity
+                  onPress={() => {
+                    onPageSize(-1); // -1 = 全部（取后端最大 pageSize）
+                    setPickerOpen(false);
+                  }}
+                  style={styles.pgSizeItem}
+                >
+                  <Text style={styles.pgSizeItemText}>全部</Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
+          </View>
+        ) : null}
+      </View>
+      <TouchableOpacity
+        onPress={onNext}
+        disabled={page >= totalPages}
+        style={[styles.pgBtn, page >= totalPages && styles.pgBtnDis]}
+      >
+        <Text style={[styles.pgBtnText, page >= totalPages && styles.pgBtnTextDis]}>下一页</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+/* 行内计数文本 "共 N 台" */
+export function Count({ total, label }: { total: number; label: string }) {
+  return (
+    <Text style={styles.countText}>
+      共 <Text style={styles.countNum}>{total}</Text> {label}
+    </Text>
   );
 }
 
@@ -455,6 +640,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginTop: 10,
   },
+  btnDisabled: { opacity: 0.4 },
   btnDanger: { backgroundColor: theme.danger },
   btnText: { color: "#fff", fontSize: 16, fontWeight: "700" },
   empty: { padding: 40, alignItems: "center" },
@@ -536,4 +722,111 @@ const styles = StyleSheet.create({
   dotOn: { backgroundColor: theme.ok, shadowColor: theme.ok, shadowOpacity: 0.3, shadowRadius: 4, shadowOffset: { width: 0, height: 0 } },
   roomName: { fontSize: 13, fontWeight: "600", color: theme.text1 },
   cardRow: { flexDirection: "row", alignItems: "center", gap: 4 },
+
+  /* ── 机柜设备模块新组件（SearchBar / Chip / Sheet / Pager / Count）── */
+  searchBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: theme.surface,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    marginHorizontal: 16,
+    marginVertical: 8,
+    borderWidth: 1,
+    borderColor: theme.border,
+    height: 40,
+  },
+  searchIcon: { fontSize: 16, color: theme.text3, marginRight: 6 },
+  searchInput: { flex: 1, fontSize: 14, color: theme.text1, paddingVertical: 0 },
+  searchClear: { fontSize: 14, color: theme.text3, paddingHorizontal: 6 },
+
+  chip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: theme.rPill,
+    borderWidth: 1,
+    borderColor: theme.border,
+    marginRight: 6,
+  },
+  chipText: { fontSize: 12, fontWeight: "600" },
+
+  mask: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(16,24,40,0.45)",
+    justifyContent: "flex-end",
+    zIndex: 999,
+  },
+  sheet: {
+    backgroundColor: theme.surface,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    maxHeight: "85%",
+    paddingBottom: 24,
+  },
+  sheetHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: theme.border,
+  },
+  sheetTitle: { fontSize: 16, fontWeight: "700", color: theme.text1 },
+  sheetClose: { fontSize: 16, color: theme.text3, padding: 4 },
+  sheetBody: { paddingHorizontal: 16, paddingTop: 12 },
+  sheetBodyScroll: { paddingHorizontal: 16, paddingTop: 12, maxHeight: 480 },
+
+  pager: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginHorizontal: 16,
+    marginVertical: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    backgroundColor: theme.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  pgBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: theme.surfaceAlt,
+  },
+  pgBtnDis: { opacity: 0.4 },
+  pgBtnText: { fontSize: 13, color: theme.text1, fontWeight: "600" },
+  pgBtnTextDis: { color: theme.text3 },
+  pgMid: { flexDirection: "row", alignItems: "center", gap: 8 },
+  pgInfo: { fontSize: 12, color: theme.text2 },
+  pgSizeBtn: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  pgSizeText: { fontSize: 12, color: theme.accent, fontWeight: "600" },
+  pgSizePop: {
+    position: "absolute",
+    bottom: 24,
+    right: 0,
+    backgroundColor: theme.surface,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: theme.border,
+    paddingVertical: 4,
+    minWidth: 96,
+    shadowColor: "#101828",
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+  },
+  pgSizeItem: { paddingVertical: 6, paddingHorizontal: 12 },
+  pgSizeItemText: { fontSize: 12, color: theme.text2 },
+  pgSizeItemTextOn: { color: theme.accent, fontWeight: "700" },
+
+  countText: { fontSize: 12, color: theme.text2 },
+  countNum: { fontSize: 14, fontWeight: "700", color: theme.text1, marginHorizontal: 2 },
 });

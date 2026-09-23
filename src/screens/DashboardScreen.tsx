@@ -56,7 +56,8 @@ export function DashboardScreen({ navigation }: any) {
     if (rooms.status === "fulfilled") {
       const list = rooms.value.data;
       const cur = list.find((r) => r.id === currentRoomId);
-      setRoomName(cur ? cur.name : list[0]?.name || "未选择机房");
+      // 只显示「真正选中」的机房；未选中时如实显示未选择，避免误导
+      setRoomName(cur?.name || "未选择机房");
     }
     if (feed.status === "fulfilled") setOps(feed.value.slice(0, 8));
     setLoading(false);
@@ -140,7 +141,7 @@ export function DashboardScreen({ navigation }: any) {
             label="设备总数"
             value={fmt(d?.total || 0)}
             sub={`服务器 ${fmt(d?.server || 0)} · 网络 ${fmt(d?.network || 0)}`}
-            onPress={() => navigation.navigate("设备Tab")}
+            onPress={() => navigation.navigate("机柜设备Tab", { segment: "devices" })}
           />
           <StatCard
             icon="🗄️"
@@ -149,7 +150,7 @@ export function DashboardScreen({ navigation }: any) {
             value={fmt(r?.total || 0)}
             sub={`已用 ${fmt(r?.used || 0)} · 空闲 ${fmt(r?.unused || 0)}`}
             bar={r?.utilization || 0}
-            onPress={() => navigation.navigate("机房Tab")}
+            onPress={() => navigation.navigate("机柜设备Tab", { segment: "racks" })}
           />
           <StatCard
             icon="👥"
