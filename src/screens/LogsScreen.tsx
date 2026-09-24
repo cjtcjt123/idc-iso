@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { request } from "../api/client";
+import { useAuth } from "../auth/AuthContext";
 import type { OperationFeed, OperationFeedItem } from "../api/types";
 import { ActivityRow, Card, Chip, EmptyState, Loading, SearchBar } from "../components/ui";
 import { theme } from "../theme";

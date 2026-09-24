@@ -138,10 +138,10 @@ export function ImportExportScreen() {
         {tab === "import" ? (
           <SectionCard title="设备导入">
             <Text style={styles.help}>第一步：下载模板，按列填写后再上传。</Text>
-            <TouchableOpacity style={[styles.btn, styles.btnGhost]} onPress={onDownloadTpl} disabled={busy}>
+            <TouchableOpacity style={[styles.btn, styles.btnGhost, !isWeb && styles.btnDisabled]} onPress={onDownloadTpl} disabled={busy || !isWeb}>
               <Text style={styles.btnGhostText}>1. 下载模板 xlsx</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.btn, styles.btnPrimary, { marginTop: 8 }]} onPress={onPickFile} disabled={busy}>
+            <TouchableOpacity style={[styles.btn, styles.btnPrimary, { marginTop: 8 }, !isWeb && styles.btnDisabled]} onPress={onPickFile} disabled={busy || !isWeb}>
               <Text style={styles.btnText}>2. 选择 xlsx 文件并导入</Text>
             </TouchableOpacity>
             {!isWeb ? <Text style={styles.webOnly}>当前为原生环境，请用网页端操作。</Text> : null}
@@ -178,7 +178,7 @@ export function ImportExportScreen() {
                 <Chip key={p} active={placement === p} label={p === "mounted" ? "上架" : p === "inventory" ? "库存" : "出库"} onPress={() => setPlacement(p)} />
               ))}
             </View>
-            <TouchableOpacity style={[styles.btn, styles.btnPrimary, { marginTop: 12 }]} onPress={onExport} disabled={busy}>
+            <TouchableOpacity style={[styles.btn, styles.btnPrimary, { marginTop: 12 }, !isWeb && styles.btnDisabled]} onPress={onExport} disabled={busy || !isWeb}>
               <Text style={styles.btnText}>导出 xlsx</Text>
             </TouchableOpacity>
             {!isWeb ? <Text style={styles.webOnly}>当前为原生环境，请用网页端导出。</Text> : null}
@@ -222,6 +222,7 @@ const styles = StyleSheet.create({
   btnGhost: { backgroundColor: theme.accentSoft },
   btnText: { color: "#fff", fontSize: 15, fontWeight: "700" },
   btnGhostText: { color: theme.accent, fontSize: 15, fontWeight: "700" },
+  btnDisabled: { opacity: 0.45 },
   webOnly: { fontSize: 11, color: theme.warn, marginTop: 8, textAlign: "center" },
   resultCard: { marginTop: 12, marginHorizontal: 0, paddingVertical: 12 },
   resultRow: { flexDirection: "row", gap: 8 },

@@ -111,10 +111,9 @@ export interface Rack {
 }
 
 // 机柜 U 位立面（GET /racks/:id/visual）
-export interface RackUnit {
-  u: number;
-  occupied: boolean;
-  id?: string;
+/** 后端 /racks/:id/visual 的 units 结构：设备/ODF 都挂在子对象下，没有顶层 id/name */
+export interface RackUnitDevice {
+  id: string;
   name?: string;
   uHeight?: number;
   uPosition?: number;
@@ -122,8 +121,24 @@ export interface RackUnit {
   modelName?: string | null;
   typeName?: string | null;
   categoryName?: string | null;
-  serialNumber?: string | null;
+  customerName?: string | null;
+  sn?: string | null;
   powerFeed?: string | null;
+}
+export interface RackUnitOdf {
+  id: string;
+  code?: string;
+  uStart?: number;
+  uHeight?: number;
+  portCount?: number;
+  portType?: string;
+  end?: "A" | "B";
+}
+export interface RackUnit {
+  u: number;
+  occupied: boolean;
+  device?: RackUnitDevice;
+  odf?: RackUnitOdf;
 }
 
 export interface RackPdu {
@@ -283,10 +298,62 @@ export interface OdfPort {
   portNo?: number;
   portName?: string;
   moduleId?: string;
-  status?: string; // idle / connected / fault ...
-  linkType?: string; // downlink / uplink
+  status?: string; // unused | used | fault | retired | planned
+  linkType?: string; // device | odf | external
   deviceId?: string | null;
+  devicePortId?: string | null;
+  linkedOdfId?: string | null;
+  linkedPortNo?: number | null;
   remotePortId?: string | null;
+  customerName?: string | null;
+  note?: string | null;
+  externalCarrier?: string | null;
+  externalCircuitNo?: string | null;
+  externalPeerSite?: string | null;
+}
+
+/** 跳线（jumper）：本端 ODF 母头 ↔ 对端（设备 / 另一 ODF / 出局） */
+export interface OdfLink {
+  id: string;
+  fromOdfId: string;
+  fromPort?: number;
+  toOdfId?: string | null;
+  toPort?: number | null;
+  toDeviceId?: string | null;
+  toDeviceSn?: string | null;
+  linkType?: string; // device | odf | external
+  label?: string;
+  cableType?: string;
+  length?: number;
+  note?: string;
+  customerId?: string | null;
+  customerName?: string | null;
+  externalInfo?: string | null;
+  ticketNo?: string | null;
+  active?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/** 端到端光路追踪节点 */
+export interface OdfTraceNode {
+  kind?: string; // od-f-local | odf-fixed | device | external | fault
+  title?: string;
+  sub?: string;
+}
+
+export interface OdfPortTrace {
+  route?: string;
+  nodes?: OdfTraceNode[];
+}
+
+/** ODF 端口历史事件 */
+export interface OdfPortHistory {
+  id: string;
+  eventType?: string; // connect | disconnect | status_change | note
+  note?: string;
+  operatorName?: string;
+  createdAt?: string;
 }
 
 export interface InventoryInstance {
@@ -544,4 +611,107 @@ export interface DashboardStats {
     byCustomer: CustomerInventoryStat[];
   };
   lifecycle: MonthlyLifecycle[];
+}
+
+// ── 客户授权（GET /customer-authorizations，机房隔离；对齐小程序 AUTH_TYPES 9 类）──
+export const AUTH_TYPES: string[] = [
+  "设备上架",
+  "设备下架",
+  "设备维护",
+  "设备巡检",
+  "人员进出机房",
+  "设备出入库",
+  "施工布线",
+  "应急操作",
+  "其他",
+];
+export const AUTH_SOURCE_OPTIONS: { value: string; label: string }[] = [
+  { value: "email", label: "邮件" },
+  { value: "paper", label: "纸质函" },
+  { value: "other", label: "其他" },
+];
+export const AUTH_SOURCE_LABELS: Record<string, string> = {
+  email: "邮件",
+  paper: "纸质函",
+  other: "其他",
+};
+
+export interface CustomerAuthorization {
+  id: string;
+  tenantId?: string;
+  roomId?: string;
+  customerId: string;
+  customer?: { id: string; name: string } | null;
+  authDate: string | null;
+  authType: string;
+  content: string;
+  source?: string;
+  operator?: string | null;
+  remark?: string | null;
+  createdAt?: string;
+}
+
+export type CreateCustomerAuthorizationPayload = {
+  customerId: string;
+  authDate: string;
+  authType: string;
+  content: string;
+  source?: string;
+  operator?: string;
+  remark?: string;
+};
+
+// ── 枚举中心（GET /enums，RBAC enum:*；对齐小程序 enum-center）──
+export interface EnumOption {
+  value: string;
+  label: string;
+  color?: string | null;
+  sortOrder?: number;
+}
+export interface EnumDef {
+  id: string;
+  tenantId?: string;
+  code: string;
+  name: string;
+  description?: string | null;
+  options: EnumOption[];
+  isSystem: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+// ── 用户与权限管理（GET /users, GET /roles；仅超管；对齐小程序 admin/users）──
+export interface AdminUser {
+  id: string;
+  username: string;
+  displayName?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  isActive?: boolean;
+  isStaff?: boolean;
+  isSuperuser?: boolean;
+  userGroup?: "ops" | "customer" | null;
+  customerId?: string | null;
+  customerName?: string | null;
+  roleId?: string | null;
+  roleName?: string | null;
+  roomIds?: string[];
+}
+export interface RoleDef {
+  id: string;
+  name: string;
+  code?: string;
+  description?: string | null;
+  permissions: string[];
+}
+
+/** 数据备份记录（对齐 miniprogram/types Backup） */
+export interface Backup {
+  id: string;
+  fileName: string;
+  fileSize: number;
+  path: string;
+  status: string; // pending | done | failed
+  error?: string | null;
+  createdAt: string;
 }

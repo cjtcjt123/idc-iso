@@ -78,6 +78,9 @@ export function RackDetailScreen({ route, navigation }: any) {
           onUnitPress={(deviceId) =>
             navigation.navigate("DeviceDetail", { deviceId })
           }
+          onOdfPress={(odfId) =>
+            navigation.navigate("OdfModuleDetail", { moduleId: odfId })
+          }
         />
       </Card>
     </ScrollView>

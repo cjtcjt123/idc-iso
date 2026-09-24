@@ -58,25 +58,40 @@ export function StockOutScreen({ navigation }: any) {
     if (user) setDocRecipient((user as any).displayName || (user as any).username || "");
   }, []);
 
-  const search = async (q: string) => {
-    if (!customerId) { alert("请先选择客户"); return; }
+  /** 只负责查，返回卡片列表（供手动搜索与扫码共用） */
+  const runSearch = async (q: string): Promise<Cart[]> => {
+    if (!customerId) { alert("请先选择客户"); return []; }
     const room = currentRoomId || undefined;
+    const [inst, dev] = await Promise.all([
+      apiList<any>("/inventory/instances", { page: 1, pageSize: 50, search: q || undefined, roomId: room, customerId }),
+      apiList<any>("/devices", { page: 1, pageSize: 50, placement: "inventory", search: q || undefined, roomId: room, customerId }),
+    ]);
+    const me = docRecipient || (user as any)?.displayName || "";
+    const cards: Cart[] = (inst.data || []).map((it: any) => buildCard(it, "material", me))
+      .concat((dev.data || []).map((d: any) => buildCard(d, "device", me)));
+    const inCart = new Set(items.map((i) => i.id));
+    setSearchResults(cards.map((c) => ({ ...c, submitState: inCart.has(c.id) ? "success" : "idle" })));
+    return cards;
+  };
+
+  const search = async (q: string) => {
     try {
-      const [inst, dev] = await Promise.all([
-        apiList<any>("/inventory/instances", { page: 1, pageSize: 50, search: q || undefined, roomId: room, customerId }),
-        apiList<any>("/devices", { page: 1, pageSize: 50, placement: "inventory", search: q || undefined, roomId: room, customerId }),
-      ]);
-      const me = docRecipient || (user as any)?.displayName || "";
-      const cards: Cart[] = (inst.data || []).map((it: any) => buildCard(it, "material", me))
-        .concat((dev.data || []).map((d: any) => buildCard(d, "device", me)));
-      const inCart = new Set(items.map((i) => i.id));
-      setSearchResults(cards.map((c) => ({ ...c, submitState: inCart.has(c.id) ? "success" : "idle" })));
+      await runSearch(q);
       setShowSearch(true);
     } catch (e: any) { alert(e?.message || "搜索失败"); }
   };
 
-  const pickFromSearch = (idx: number) => {
-    const p = searchResults[idx];
+  /** 扫码回来：把命中的物品直接加入出库单（唯一命中直接加，否则让用户挑） */
+  const onScanned = async (code: string) => {
+    setKeyword(code);
+    try {
+      const cards = await runSearch(code);
+      if (cards.length === 1) addCard(cards[0]);
+      else setShowSearch(true);
+    } catch (e: any) { alert(e?.message || "搜索失败"); }
+  };
+
+  const addCard = (p: Cart) => {
     if (!p) return;
     if (items.some((i) => i.id === p.id)) { alert("已在出库单中"); setShowSearch(false); return; }
     const card: Cart = {
@@ -87,6 +102,8 @@ export function StockOutScreen({ navigation }: any) {
     setItems((arr) => [...arr, card]);
     setShowSearch(false);
   };
+
+  const pickFromSearch = (idx: number) => addCard(searchResults[idx]);
 
   const setItem = (id: string, patch: Partial<Cart>) => setItems((arr) => arr.map((i) => (i.id === id ? { ...i, ...patch } : i)));
   const removeItem = (id: string) => setItems((arr) => arr.filter((i) => i.id !== id));
@@ -169,8 +186,8 @@ export function StockOutScreen({ navigation }: any) {
         <View style={s.form}>
           <Field label="往来客户 *" value={customers.find((c) => c.id === customerId)?.name || "请选择"} onPress={() => setActivePicker("customer")} />
           <Field label="出库类型" value={OUTBOUND_TYPES[outboundIdx]?.label || "领用出库"} onPress={() => setActivePicker("outbound")} />
-          <TouchableOpacity style={s.scanBtn} onPress={() => navigation.navigate("Scan")}>
-            <Text style={s.scanTxt}>扫一扫（条码 / SN）匹配出库</Text>
+          <TouchableOpacity style={s.scanBtn} onPress={() => navigation.navigate("Scan", { mode: "pick", onPick: (code: string) => { onScanned(code); } })}>
+            <Text style={s.scanTxt}>扫一扫（条码 / SN）加入出库单</Text>
           </TouchableOpacity>
           <View style={s.searchRow}>
             <Input value={keyword} onChangeText={setKeyword} placeholder="搜索物品名称 / 型号 / SN" />
@@ -219,7 +236,7 @@ export function StockOutScreen({ navigation }: any) {
         <View>
           <Input value={keyword} onChangeText={(t) => { setKeyword(t); search(t); }} placeholder="搜索物品名称 / 型号 / SN" />
           <FlatList data={searchResults} keyExtractor={(c) => c.id} style={{ maxHeight: 380 }} renderItem={({ item }) => (
-            <ListRow title={item.name} subtitle={item.kind === "device" ? "库存待用设备" : `库存 ${item.quantity}${item.unit || ""}`} onPress={() => pickFromSearch(searchResults.indexOf(item))} />
+            <ListRow title={item.name} subtitle={item.kind === "device" ? "库存待用设备" : `库存 ${item.quantity}${item.unit || ""}`} onPress={() => addCard(item)} />
           )} ListEmptyComponent={<EmptyState text="无匹配物品" />} />
         </View>
       </Sheet>

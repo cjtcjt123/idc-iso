@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { FlatList, RefreshControl, View } from "react-native";
 import { apiCollect } from "../api/client";
+import { useAuth } from "../auth/AuthContext";
 import type { OperationRecord } from "../api/types";
 import { Badge, EmptyState, ListRow, Loading } from "../components/ui";
 
@@ -14,13 +15,14 @@ const KIND_LABEL: Record<string, string> = {
 };
 
 export function OperationsScreen({ navigation }: any) {
+  const { currentRoomId } = useAuth();
   const [ops, setOps] = useState<OperationRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = async () => {
     try {
-      const res = await apiCollect<OperationRecord>("/inventory/operations");
+      const res = await apiCollect<OperationRecord>("/inventory/operations", { roomId: currentRoomId || undefined });
       setOps(res);
     } finally {
       setLoading(false);
@@ -30,7 +32,7 @@ export function OperationsScreen({ navigation }: any) {
 
   useEffect(() => {
     load();
-  }, []);
+  }, [currentRoomId]);
 
   if (loading) return <Loading />;
 

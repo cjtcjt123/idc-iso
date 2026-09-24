@@ -6,10 +6,16 @@ import type { InventoryInstance } from "../api/types";
 import { EmptyState, ListRow, Loading } from "../components/ui";
 import { theme } from "../theme";
 
-export function ScanScreen({ navigation }: any) {
+export function ScanScreen({ navigation, route }: any) {
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const [matches, setMatches] = useState<InventoryInstance[]>([]);
+  /**
+   * 取码模式：入库/出库页调用时传 mode:"pick" + onPick(code)。
+   * 扫到后把条码原样回传给单据页并立刻返回，而不是跳去物料详情 —— 否则「扫一扫」与单据完全脱节。
+   */
+  const pickMode = route?.params?.mode === "pick";
+  const onPick = route?.params?.onPick as ((code: string) => void) | undefined;
 
   if (!permission) return <Loading />;
   if (!permission.granted) {
@@ -26,6 +32,12 @@ export function ScanScreen({ navigation }: any) {
   const onScan = async (data: string) => {
     if (scanned) return;
     setScanned(true);
+    // 取码模式：把条码原样交回单据页，由单据页去查并加入单据
+    if (pickMode && onPick) {
+      onPick(data);
+      navigation.goBack();
+      return;
+    }
     try {
       const res: any = await apiGet(`/inventory/search?q=${encodeURIComponent(data)}`);
       const list: any[] = res?.instances || (Array.isArray(res) ? res : []);

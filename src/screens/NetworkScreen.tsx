@@ -102,15 +102,20 @@ export function NetworkScreen() {
   const [subnets, setSubnets] = useState<Subnet[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [openId, setOpenId] = useState<string | null>(null);
+  // 多子网可同时展开（对齐小程序：各子网就地展开 IP 矩阵）
+  const [openIds, setOpenIds] = useState<Set<string>>(new Set());
   const [ips, setIps] = useState<Record<string, IpAddress[]>>({});
-  const [loadingIp, setLoadingIp] = useState(false);
+  const [loadingIpIds, setLoadingIpIds] = useState<Set<string>>(new Set());
 
   const load = async () => {
     try {
       const res = await apiCollect<Subnet>("/networks/subnets", { roomId: currentRoomId || undefined });
       setSubnets(res);
-      if (res.length && !openId) setOpenId(res[0].id);
+      // 默认展开首个子网，便于立即看到 IP 分布
+      if (res.length) {
+        setOpenIds(new Set([res[0].id]));
+        loadIps(res[0].id);
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -119,22 +124,32 @@ export function NetworkScreen() {
 
   const loadIps = async (subnetId: string) => {
     if (ips[subnetId]) return;
-    setLoadingIp(true);
+    setLoadingIpIds((s) => new Set(s).add(subnetId));
     try {
       const res = await apiCollect<IpAddress>(`/networks/subnets/${subnetId}/addresses`, { pageSize: 256 });
       setIps((m) => ({ ...m, [subnetId]: res }));
     } finally {
-      setLoadingIp(false);
+      setLoadingIpIds((s) => {
+        const n = new Set(s);
+        n.delete(subnetId);
+        return n;
+      });
     }
+  };
+
+  const toggle = (id: string) => {
+    setOpenIds((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+    if (!openIds.has(id)) loadIps(id);
   };
 
   useEffect(() => {
     load();
   }, [currentRoomId]);
-
-  useEffect(() => {
-    if (openId) loadIps(openId);
-  }, [openId]);
 
   if (loading) return <Loading />;
 
@@ -144,37 +159,36 @@ export function NetworkScreen() {
         data={subnets}
         keyExtractor={(s) => s.id}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={load} />}
-        ListHeaderComponent={
-          openId && ips[openId] ? (
-            <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
-              <Text style={styles.sectionTitle}>IP 分布</Text>
-              <Card>
-                <IpMatrix ips={ips[openId]} cidr={deriveCidr(subnets.find((s) => s.id === openId) || {} as Subnet)} />
-              </Card>
-              {loadingIp ? <Text style={styles.loadingHint}>加载 IP…</Text> : null}
-            </View>
-          ) : null
-        }
         renderItem={({ item }) => {
-          const open = item.id === openId;
+          const open = openIds.has(item.id);
           const anyS = item as any;
           const cidrTxt = deriveCidr(item) || anyS.networkAddr || "-";
           const vlanTxt = anyS.vlanId ?? item.vlan ?? "-";
           const gwTxt = item.gateway || anyS.gateway || "-";
           return (
-            <TouchableOpacity activeOpacity={0.85} onPress={() => setOpenId(item.id)} style={{ marginHorizontal: 16, marginVertical: 6 }}>
-              <Card>
-                <View style={styles.row}>
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={styles.subTitle}>{item.name || cidrTxt}</Text>
-                    <Text style={styles.subMeta}>
-                      {cidrTxt} · VLAN {vlanTxt} · 网关 {gwTxt}
-                    </Text>
+            <View style={{ marginHorizontal: 16, marginVertical: 6 }}>
+              <TouchableOpacity activeOpacity={0.85} onPress={() => toggle(item.id)}>
+                <Card>
+                  <View style={styles.row}>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={styles.subTitle}>{item.name || cidrTxt}</Text>
+                      <Text style={styles.subMeta}>
+                        {cidrTxt} · VLAN {vlanTxt} · 网关 {gwTxt}
+                      </Text>
+                    </View>
+                    <Badge label={open ? "收起" : "展开"} color={open ? theme.accent : theme.text2} />
                   </View>
-                  <Badge label={open ? "展开中" : `${item.capacity || 0} 地址`} color={open ? theme.accent : theme.text2} />
-                </View>
-              </Card>
-            </TouchableOpacity>
+                </Card>
+              </TouchableOpacity>
+              {open ? (
+                <Card style={styles.matrixCard}>
+                  <IpMatrix ips={ips[item.id] || []} cidr={deriveCidr(item)} />
+                  {loadingIpIds.has(item.id) && !ips[item.id] ? (
+                    <Text style={styles.loadingHint}>加载 IP…</Text>
+                  ) : null}
+                </Card>
+              ) : null}
+            </View>
           );
         }}
         ListEmptyComponent={<EmptyState text="暂无子网" />}
@@ -188,7 +202,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center" },
   subTitle: { fontSize: 14, color: theme.text1, fontWeight: "600" },
   subMeta: { fontSize: 11, color: theme.text3, marginTop: 4 },
-  sectionTitle: { fontSize: 13, fontWeight: "700", color: theme.text2, marginBottom: 8, marginLeft: 4 },
+  matrixCard: { marginTop: 6 },
   matrix: { flexDirection: "row", flexWrap: "wrap", gap: 4 },
   cell: {
     width: "7.4%",

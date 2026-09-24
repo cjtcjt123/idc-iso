@@ -91,6 +91,23 @@ export function apiDelete<T>(path: string): Promise<T> {
   return request<T>("DELETE", path);
 }
 
+/** 二进制下载（如备份文件）：返回 ArrayBuffer，调用方自行落盘。仅后端已门禁的接口可走此路。 */
+export async function apiDownloadBuffer(path: string): Promise<ArrayBuffer> {
+  const base = await resolveBase();
+  const url = new URL(base + API_PREFIX + path);
+  const token = await tokenStorage.load();
+  const headers: Record<string, string> = {};
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const res = await fetch(url.toString(), { method: "GET", headers });
+  if (res.status === 401) {
+    await tokenStorage.clear();
+    onUnauthorized?.();
+    throw new ApiError(401, "登录已失效，请重新登录");
+  }
+  if (!res.ok) throw new ApiError(res.status, `下载失败 (${res.status})`);
+  return await res.arrayBuffer();
+}
+
 /** 列表类接口统一收成数组：兼容「分页信封 {data:[]}」与「裸数组」两种返回 */
 export async function apiCollect<T>(
   path: string,

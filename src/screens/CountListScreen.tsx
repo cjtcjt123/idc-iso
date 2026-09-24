@@ -66,15 +66,13 @@ export function CountListScreen({ navigation }: any) {
             const counted = t.counted || 0;
             const pct = total ? Math.round((counted / total) * 100) : 0;
             return (
-              <TouchableOpacity
-                key={t.id}
-                activeOpacity={0.9}
-                onPress={() =>
-                  navigation.navigate(t.status === "done" ? "CountReport" : "CountRun", { id: t.id })
-                }
-                onLongPress={() => t.status !== "done" && remove(t)}
-              >
-                <Card>
+              <Card>
+                <TouchableOpacity
+                  activeOpacity={0.9}
+                  onPress={() =>
+                    navigation.navigate(t.status === "done" ? "CountReport" : "CountRun", { id: t.id })
+                  }
+                >
                   <View style={styles.rowTop}>
                     <Text style={styles.title}>
                       {kindLabel(t.kind)} · {t.customerName || "—"}
@@ -98,8 +96,13 @@ export function CountListScreen({ navigation }: any) {
                       差异：缺失 {t.missing || 0} · 移位 {t.misplaced || 0} · 盘盈 {t.unexpected || 0}
                     </Text>
                   ) : null}
-                </Card>
-              </TouchableOpacity>
+                </TouchableOpacity>
+                {t.status !== "done" ? (
+                  <TouchableOpacity activeOpacity={0.8} style={styles.delRow} onPress={() => remove(t)}>
+                    <Text style={styles.delText}>删除此任务</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </Card>
             );
           })}
           <View style={styles.foot} />
@@ -124,4 +127,6 @@ const styles = StyleSheet.create({
   barNum: { fontSize: 12, color: theme.text2, fontWeight: "600" },
   diff: { fontSize: 12, color: theme.warn, marginTop: 8 },
   foot: { height: 20 },
+  delRow: { borderTopWidth: 1, borderColor: theme.border, marginTop: 10, paddingTop: 10, alignItems: "center" },
+  delText: { color: theme.danger, fontSize: 14, fontWeight: "700" },
 });

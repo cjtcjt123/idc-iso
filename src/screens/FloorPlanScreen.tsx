@@ -11,7 +11,7 @@ import {
 import { apiCollect, apiDelete, apiGet, apiList, apiPatch, apiPost, apiPut } from "../api/client";
 import type { Floor, Rack, Room, Zone, ZoneGrid } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
-import { useCan } from "../auth/permission";
+import { useCan, customerScopeId } from "../auth/permission";
 import { EmptyState, Input, ListRow, Loading, Sheet } from "../components/ui";
 import { theme } from "../theme";
 
@@ -83,7 +83,8 @@ function buildColumns(
   };
   const out: Column[] = [];
   out.push({ type: "aisle", boundary: 0, wall: true, t: aisleType(0) });
-  for (let c = 0; c < cols; c++) {
+  // 列号与后端一致：1-based（1..cols）。曾误用 0-based，导致最后一列机柜永不渲染。
+  for (let c = 1; c <= cols; c++) {
     const items: CellItem[] = [];
     let runStart = -1;
     let runLen = 0;
@@ -113,7 +114,7 @@ function buildColumns(
     }
     flush();
     out.push({ type: "rack", col: c, items });
-    out.push({ type: "aisle", boundary: c + 1, wall: c + 1 === cols, t: aisleType(c + 1) });
+    out.push({ type: "aisle", boundary: c, wall: c === cols, t: aisleType(c) });
   }
   return out;
 }
@@ -123,10 +124,12 @@ type SheetKind =
   | "nav" | "customer" | "cell" | "kind" | "name" | "rackPick" | "rackAct" | "phAct" | "zone";
 
 export function FloorPlanScreen({ navigation }: any) {
-  const { currentRoomId } = useAuth();
+  const { currentRoomId, user } = useAuth();
   const can = useCan();
   const canEditRack = can("rack", "update") || can("rack", "create");
   const canCreateRoom = can("room", "create");
+  // 客户组成员：默认高亮其所属客户（对齐小程序 forcedCustomerId），不可切到其它客户
+  const forcedCust = customerScopeId(user);
 
   const [roomName, setRoomName] = useState("");
   const [floors, setFloors] = useState<Floor[]>([]);
@@ -162,7 +165,7 @@ export function FloorPlanScreen({ navigation }: any) {
     if (!currentRoomId) { setLoading(false); return; }
     (async () => {
       try {
-        const rooms = await apiList<Room>("/rooms", { pageSize: 100 });
+        const rooms = await apiList<Room>("/rooms/mine", { pageSize: 100 });
         const cur = rooms.data.find((r) => r.id === currentRoomId);
         if (cur) setRoomName(cur.name || "");
         const [fl, cs] = await Promise.all([
@@ -171,6 +174,7 @@ export function FloorPlanScreen({ navigation }: any) {
         ]);
         setFloors(fl);
         setCustomers(cs);
+        if (forcedCust) setFilterCustomerId(forcedCust);
         if (fl.length) setFloorId(fl[0].id);
       } finally { setLoading(false); }
     })();
@@ -251,14 +255,15 @@ export function FloorPlanScreen({ navigation }: any) {
       return;
     }
     if (!cell.occupied) {
-      if (!editMode) return;
+      if (!editMode) { Alert.alert("提示", "点右上角「布局」进入编辑模式后，可在此摆放机柜 / 新建占位块"); return; }
       if (!canEditRack && !canCreateRoom) { Alert.alert("没有权限", "需要机柜或机房创建权限"); return; }
       setPendingCell({ col: cell.col, row: cell.row });
       setSheet("cell");
       return;
     }
     if (cell.isPlaceholder) {
-      if (!editMode || !canCreateRoom) return;
+      if (!editMode) { Alert.alert("提示", "点右上角「布局」进入编辑模式后，可管理占位块"); return; }
+      if (!canCreateRoom) { Alert.alert("没有权限", "需要机房创建权限"); return; }
       setPhTarget({ id: cell.placeholderId || "", name: cell.rackName || "占位块" });
       setConfirming(null);
       setSheet("phAct");
@@ -373,7 +378,15 @@ export function FloorPlanScreen({ navigation }: any) {
     if (!zName.trim() || !c || !r) { Alert.alert("请填写区域名、列数、行数"); return; }
     setBusy(true);
     apiPost("/zones", { name: zName.trim(), roomId: currentRoomId, floorId, cols: c, rows: r })
-      .then(() => { setSheet(null); setZName(""); setZCols(""); setZRows(""); })
+      .then(async () => {
+        setSheet(null); setZName(""); setZCols(""); setZRows("");
+        // 刷新区域列表，否则新区域创建成功但不出现在切换器里
+        if (floorId) {
+          const zs = await apiCollect<Zone>("/zones", { floorId });
+          setZones(zs);
+          if (zs.length) setZoneId(zs[zs.length - 1].id);
+        }
+      })
       .catch((e: any) => Alert.alert("创建失败", e?.message || ""))
       .finally(() => setBusy(false));
   };

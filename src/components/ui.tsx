@@ -87,7 +87,7 @@ export function StatCard({
     </View>
   );
   return onPress ? (
-    <TouchableOpacity activeOpacity={0.9}>{body}</TouchableOpacity>
+    <TouchableOpacity activeOpacity={0.9} onPress={onPress}>{body}</TouchableOpacity>
   ) : (
     body
   );
@@ -205,14 +205,16 @@ export function ActivityRow({
   kind,
   desc,
   meta,
+  onPress,
 }: {
   kind?: string;
   desc: string;
   meta?: string;
+  onPress?: () => void;
 }) {
   const tint = (kind && ACTIVITY_TINT[kind]) || ACTIVITY_TINT.mat;
   const label = (kind && ACTIVITY_LABEL[kind]) || kind || "记录";
-  return (
+  const body = (
     <View style={styles.actRow}>
       <View style={[styles.kBadge, { backgroundColor: tint.bg }]}>
         <Text style={[styles.kBadgeText, { color: tint.fg }]}>{label}</Text>
@@ -225,6 +227,10 @@ export function ActivityRow({
       </View>
     </View>
   );
+  if (onPress) {
+    return <TouchableOpacity activeOpacity={0.7} onPress={onPress}>{body}</TouchableOpacity>;
+  }
+  return body;
 }
 
 /* 顶栏机房胶囊 */
@@ -334,12 +340,14 @@ export function Input({
   placeholder,
   secure,
   style,
+  keyboardType,
 }: {
   value: string;
   onChangeText: (t: string) => void;
   placeholder?: string;
   secure?: boolean;
   style?: any;
+  keyboardType?: "default" | "numeric" | "email-address" | "phone-pad";
 }) {
   return (
     <TextInput
@@ -349,6 +357,7 @@ export function Input({
       placeholder={placeholder}
       placeholderTextColor={theme.text3}
       secureTextEntry={secure}
+      keyboardType={keyboardType}
       autoCapitalize="none"
       autoCorrect={false}
     />

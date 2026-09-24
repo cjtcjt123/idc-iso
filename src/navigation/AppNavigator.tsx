@@ -28,6 +28,10 @@ import { ProfileScreen } from "../screens/ProfileScreen";
 import { CustomersScreen } from "../screens/CustomersScreen";
 import { CustomerDetailScreen } from "../screens/CustomerDetailScreen";
 import { CustomerCreateScreen } from "../screens/CustomerCreateScreen";
+import { CustomerAuthorizationScreen } from "../screens/CustomerAuthorizationScreen";
+import { EnumCenterScreen } from "../screens/EnumCenterScreen";
+import { UserManagementScreen } from "../screens/UserManagementScreen";
+import { BackupScreen } from "../screens/BackupScreen";
 import { AccessoriesScreen } from "../screens/AccessoriesScreen";
 import { AccessoryDetailScreen } from "../screens/AccessoryDetailScreen";
 import { OperationsScreen } from "../screens/OperationsScreen";
@@ -110,6 +114,8 @@ function InventoryStack() {
       <Stack.Screen name="Locations" component={S(LocationsScreen)} options={{ title: "库位" }} />
       <Stack.Screen name="Categories" component={S(CategoriesScreen)} options={{ title: "分类 / 物料" }} />
       <Stack.Screen name="ProductEdit" component={S(ProductEditScreen)} options={{ title: "物料" }} />
+      {/* 库存页点设备卡片 → 设备详情（此前只在 Hardware/Profile 栈注册，库存栈内跳转无效） */}
+      <Stack.Screen name="DeviceDetail" component={S(DeviceDetailScreen)} options={{ title: "设备详情" }} />
       <Stack.Screen name="Logs" component={S(LogsScreen)} options={{ title: "操作日志" }} />
       <Stack.Screen name="CountList" component={S(CountListScreen)} options={{ title: "盘点任务" }} />
       <Stack.Screen name="CountCreate" component={S(CountCreateScreen)} options={{ title: "新建盘点" }} />
@@ -123,6 +129,9 @@ function FloorPlanStack() {
   return (
     <Stack.Navigator>
       <Stack.Screen name="FloorPlan" component={S(FloorPlanScreen)} options={{ title: "平面图" }} />
+      {/* 平面图点机柜 → 机柜 U 位立面 / 设备详情（此前未注册，跳转静默失效） */}
+      <Stack.Screen name="RackDetail" component={S(RackDetailScreen)} options={{ title: "机柜" }} />
+      <Stack.Screen name="DeviceDetail" component={S(DeviceDetailScreen)} options={{ title: "设备详情" }} />
     </Stack.Navigator>
   );
 }
@@ -134,6 +143,10 @@ function ProfileStack() {
       <Stack.Screen name="Customers" component={S(CustomersScreen)} options={{ title: "客户" }} />
       <Stack.Screen name="CustomerDetail" component={S(CustomerDetailScreen)} options={{ title: "客户详情" }} />
       <Stack.Screen name="CustomerCreate" component={S(CustomerCreateScreen)} options={{ title: "新建客户" }} />
+      <Stack.Screen name="CustomerAuthorization" component={S(CustomerAuthorizationScreen)} options={{ title: "客户授权" }} />
+      <Stack.Screen name="EnumCenter" component={S(EnumCenterScreen)} options={{ title: "枚举中心" }} />
+      <Stack.Screen name="UserManagement" component={S(UserManagementScreen)} options={{ title: "用户与权限" }} />
+      <Stack.Screen name="Backup" component={S(BackupScreen)} options={{ title: "数据备份" }} />
       <Stack.Screen name="Accessories" component={S(AccessoriesScreen)} options={{ title: "配件" }} />
       <Stack.Screen name="AccessoryDetail" component={S(AccessoryDetailScreen)} options={{ title: "配件详情" }} />
       <Stack.Screen name="Operations" component={S(OperationsScreen)} options={{ title: "出入库流水" }} />
@@ -150,6 +163,9 @@ function ProfileStack() {
       <Stack.Screen name="Settings" component={S(SettingsScreen)} options={{ title: "设置" }} />
       <Stack.Screen name="AdminConsole" component={S(AdminConsoleScreen)} options={{ title: "管理台" }} />
       <Stack.Screen name="Facilities" component={S(FacilitiesScreen)} options={{ title: "机房设施" }} />
+      {/* 管理台磁贴「物品与分类 / 库位管理」跨栈跳转（此前仅在 InventoryStack 注册） */}
+      <Stack.Screen name="Categories" component={S(CategoriesScreen)} options={{ title: "分类 / 物料" }} />
+      <Stack.Screen name="Locations" component={S(LocationsScreen)} options={{ title: "库位" }} />
     </Stack.Navigator>
   );
 }

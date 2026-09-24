@@ -43,6 +43,18 @@ export function HardwareScreen({ route, navigation }: any) {
         </View>
       </View>
 
+      {/* 快捷操作：网络管理 / 导入导出（对齐小程序 机柜设备页 一级入口，P3 入口上浮） */}
+      <View style={styles.quickRow}>
+        <TouchableOpacity activeOpacity={0.85} style={styles.quickBtn} onPress={() => navigation.navigate("我的Tab", { screen: "Network" })}>
+          <Text style={styles.quickIcon}>🔗</Text>
+          <Text style={styles.quickLabel}>网络管理</Text>
+        </TouchableOpacity>
+        <TouchableOpacity activeOpacity={0.85} style={styles.quickBtn} onPress={() => navigation.navigate("我的Tab", { screen: "ImportExport" })}>
+          <Text style={styles.quickIcon}>⬆️</Text>
+          <Text style={styles.quickLabel}>导入导出</Text>
+        </TouchableOpacity>
+      </View>
+
       <View style={{ flex: 1 }}>
         {!currentRoomId && seg !== "odf" ? (
           <View style={{ flex: 1, justifyContent: "center" }}>
@@ -74,4 +86,8 @@ const styles = StyleSheet.create({
   segBtnOn: { backgroundColor: theme.accent },
   segText: { fontSize: 14, fontWeight: "600", color: theme.text2 },
   segTextOn: { color: "#fff" },
+  quickRow: { flexDirection: "row", gap: 10, paddingHorizontal: 16, paddingBottom: 8 },
+  quickBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border, borderRadius: theme.r, paddingVertical: 12 },
+  quickIcon: { fontSize: 16 },
+  quickLabel: { fontSize: 14, fontWeight: "600", color: theme.text1 },
 });

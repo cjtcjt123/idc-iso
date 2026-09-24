@@ -99,6 +99,18 @@ export function StockInScreen({ navigation }: any) {
     finally { loading.current = false; }
   };
 
+  /** 扫码回来：按条码查物品，唯一命中直接加入入库单，否则打开选择弹层 */
+  const onScanned = async (code: string) => {
+    setKeyword(code);
+    try {
+      const res = await apiList<any>("/inventory/items", { q: code, pageSize: 50 });
+      const list = res.data || [];
+      setProducts(list);
+      if (list.length === 1) addMaterial(list[0]);
+      else setShowProductSheet(true);
+    } catch { setShowProductSheet(true); }
+  };
+
   const addMaterial = (p: any) => {
     const key = `r-${++_seq}`;
     setRows((rs) => [...rs, {
@@ -222,8 +234,8 @@ export function StockInScreen({ navigation }: any) {
           <Field label="归属客户 *" value={customers.find((c) => c.id === customerId)?.name || "请选择"} onPress={() => setActivePicker("customer")} />
           <Field label="入库类型" value={INBOUND_TYPES[inboundIdx]?.label || "采购入库"} onPress={() => setActivePicker("inbound")} />
 
-          <TouchableOpacity style={s.scanBtn} onPress={() => navigation.navigate("Scan")}>
-            <Text style={s.scanTxt}>扫一扫（条码 / SN）</Text>
+          <TouchableOpacity style={s.scanBtn} onPress={() => navigation.navigate("Scan", { mode: "pick", onPick: (code: string) => { onScanned(code); } })}>
+            <Text style={s.scanTxt}>扫一扫（条码 / SN）加入入库单</Text>
           </TouchableOpacity>
           <View style={s.searchRow}>
             <Input value={keyword} onChangeText={(t) => { setKeyword(t); searchProducts(t); }} placeholder="搜索物品名称 / 型号" />
@@ -284,7 +296,7 @@ export function StockInScreen({ navigation }: any) {
           <Input value={keyword} onChangeText={(t) => { setKeyword(t); searchProducts(t); }} placeholder="搜索物品名称 / 型号" />
           <FlatList data={products} keyExtractor={(p) => p.id || p.name} style={{ maxHeight: 360 }} renderItem={({ item }) => (
             <ListRow title={item.name} subtitle={item.model ? `型号 ${item.model}` : undefined} onPress={() => addMaterial(item)} />
-          )} ListEmptyComponent={<EmptyState text="无匹配物品" />} />
+          )} ListEmptyComponent={<EmptyState text={keyword ? `无匹配「${keyword}」的物品` : "无匹配物品"} />} />
         </View>
       </Sheet>
 

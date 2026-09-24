@@ -14,6 +14,9 @@ interface CreateState {
   name: string;
   code: string;
   parentId: string;
+  /** 区域网格尺寸（新建区域必填，后端 POST /zones 要求 roomId + cols + rows） */
+  cols: string;
+  rows: string;
 }
 
 const TYPE_LABEL: Record<LocType, string> = {
@@ -32,11 +35,11 @@ export function FacilitiesScreen() {
   const [msg, setMsg] = useState("");
   const [openRoomId, setOpenRoomId] = useState<string | null>(null);
   const [openFloorId, setOpenFloorId] = useState<string | null>(null);
-  const [create, setCreate] = useState<CreateState>({ open: false, type: "room", name: "", code: "", parentId: "" });
+  const [create, setCreate] = useState<CreateState>({ open: false, type: "room", name: "", code: "", parentId: "", cols: "", rows: "" });
 
   const load = async () => {
     try {
-      const rs = await apiCollect<Room>("/rooms", { pageSize: 100 });
+      const rs = await apiCollect<Room>("/rooms/mine", { pageSize: 100 });
       setRooms(rs);
       if (rs.length) {
         const cur = rs.find((r) => r.id === currentRoomId) || rs[0];
@@ -77,12 +80,19 @@ export function FacilitiesScreen() {
   }, []);
 
   const openCreate = (type: LocType, parentId = "") => {
-    setCreate({ open: true, type, name: "", code: "", parentId });
+    setCreate({ open: true, type, name: "", code: "", parentId, cols: "", rows: "" });
     setMsg("");
   };
 
   const submitCreate = async () => {
     if (!create.name.trim()) return setMsg("名称不能为空");
+    if (create.type === "zone") {
+      const c = Number(create.cols);
+      const r = Number(create.rows);
+      if (!Number.isInteger(c) || !Number.isInteger(r) || c < 1 || r < 1) {
+        return setMsg("区域网格列数/行数必须为 ≥1 的整数");
+      }
+    }
     setBusy(true);
     try {
       if (create.type === "room") {
@@ -90,7 +100,15 @@ export function FacilitiesScreen() {
       } else if (create.type === "floor") {
         await apiPost("/floors", { name: create.name, code: create.code || undefined, roomId: create.parentId });
       } else {
-        await apiPost("/zones", { name: create.name, code: create.code || undefined, floorId: create.parentId });
+        // POST /zones（顶层）要求 roomId + cols + rows，缺任一必 400
+        await apiPost("/zones", {
+          name: create.name,
+          code: create.code || undefined,
+          roomId: openRoomId || undefined,
+          floorId: create.parentId,
+          cols: Number(create.cols),
+          rows: Number(create.rows),
+        });
       }
       setMsg(`已创建${TYPE_LABEL[create.type]}`);
       setCreate({ ...create, open: false });
@@ -205,6 +223,28 @@ export function FacilitiesScreen() {
               onChangeText={(t) => setCreate({ ...create, code: t })}
               autoCapitalize="characters"
             />
+            {create.type === "zone" ? (
+              <>
+                <Text style={styles.lbl}>网格列数 *</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="例如 12"
+                  placeholderTextColor={theme.text3}
+                  keyboardType="numeric"
+                  value={create.cols}
+                  onChangeText={(t) => setCreate({ ...create, cols: t })}
+                />
+                <Text style={styles.lbl}>网格行数 *</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="例如 8"
+                  placeholderTextColor={theme.text3}
+                  keyboardType="numeric"
+                  value={create.rows}
+                  onChangeText={(t) => setCreate({ ...create, rows: t })}
+                />
+              </>
+            ) : null}
             <View style={{ flexDirection: "row", gap: 10, marginTop: 12 }}>
               <TouchableOpacity style={[styles.modalBtn, styles.modalBtnGhost]} onPress={() => setCreate({ ...create, open: false })}>
                 <Text style={styles.modalBtnGhostText}>取消</Text>

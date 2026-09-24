@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   FlatList,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -29,8 +30,9 @@ const STATUS_TINT: Record<string, { fg: string; bg: string; text: string }> = {
   unused: { fg: "#12b76a", bg: "#e7f7ef", text: "空闭" },
   fault: { fg: "#f04438", bg: "#fdeceb", text: "故障" },
 };
-type FiberMode = "single" | "multi" | "";
-type PortType = "lc" | "sc" | "fc" | "";
+type FiberMode = "single-mode" | "multi-mode" | "";
+type PortType = "LC" | "SC" | "MPO" | "";
+/** 后端枚举：fiberMode 是 single-mode / multi-mode，portType 是 LC / SC / MPO（都不是前端习惯的小写） */
 
 export function OdfScreen({ navigation }: any) {
   const { currentRoomId } = useAuth();
@@ -47,11 +49,16 @@ export function OdfScreen({ navigation }: any) {
   const [mName, setMName] = useState("");
   const [mRackId, setMRackId] = useState("");
   const [mPorts, setMPorts] = useState("");
-  const [mFiber, setMFiber] = useState<FiberMode>("single");
-  const [mPortType, setMPortType] = useState<PortType>("lc");
+  const [mFiber, setMFiber] = useState<FiberMode>("single-mode");
+  const [mPortType, setMPortType] = useState<PortType>("LC");
+  // A/B 双端固定语义：A 端起始 U、B 端机柜、B 端起始 U 都是后端必填
+  const [mUStart, setMUStart] = useState("1");
+  const [mBRackId, setMBRackId] = useState("");
+  const [mBUStart, setMBUStart] = useState("1");
   const [saving, setSaving] = useState(false);
 
   const load = async () => {
+    setRefreshing(true);
     try {
       const res = await apiCollect<OdfModule>("/odf/modules");
       setModules(res);
@@ -86,24 +93,35 @@ export function OdfScreen({ navigation }: any) {
 
   const openCreate = () => {
     if (!racks.length) { Alert.alert("提示", "当前机房暂无机柜，无法挂载 ODF 模块"); return; }
-    setMName(""); setMRackId(""); setMPorts(""); setMFiber("single"); setMPortType("lc");
+    setMName(""); setMRackId(""); setMPorts("24"); setMFiber("single-mode"); setMPortType("LC");
+    setMUStart("1"); setMBRackId(""); setMBUStart("1");
     setCreating(true);
   };
   const confirmCreate = async () => {
-    if (!mName.trim()) { Alert.alert("请填写模块名称"); return; }
-    if (!mRackId) { Alert.alert("请选择机柜"); return; }
+    if (!mName.trim()) { Alert.alert("请填写模块编码"); return; }
+    if (!mRackId) { Alert.alert("请选择 A 端机柜"); return; }
+    if (!mBRackId) { Alert.alert("请选择 B 端机柜"); return; }
     const n = Number(mPorts);
     if (!Number.isInteger(n) || n < 1) { Alert.alert("请填写有效端口数（≥1）"); return; }
+    const uStart = Number(mUStart);
+    const bUStart = Number(mBUStart);
+    if (!Number.isInteger(uStart) || uStart < 1) { Alert.alert("请填写 A 端起始 U（≥1）"); return; }
+    if (!Number.isInteger(bUStart) || bUStart < 1) { Alert.alert("请填写 B 端起始 U（≥1）"); return; }
     setSaving(true);
     try {
-      const mod: any = await apiPost("/odf/modules", {
-        name: mName.trim(), roomId: currentRoomId, rackId: mRackId,
-        portCount: n, fiberMode: mFiber, portType: mPortType,
+      // OdfModule 落库只有 code 没有 name，名称就写进 code
+      await apiPost("/odf/modules", {
+        code: mName.trim(),
+        roomId: currentRoomId,
+        rackId: mRackId,
+        uStart,
+        bRackId: mBRackId,
+        bUStart,
+        portCount: n,
+        fiberMode: mFiber || "single-mode",
+        portType: mPortType || "LC",
       });
-      // 逐个创建端口（后端 POST /odf/ports?moduleId=）
-      for (let i = 1; i <= n; i++) {
-        await apiPost(`/odf/ports?moduleId=${mod.id}`, { portNo: i, portName: String(i) });
-      }
+      // 端口由后端在建模块时自动初始化（unused），前端不要再逐个 POST，否则会重复建一份
       Alert.alert("已创建", `${mName.trim()}（${n} 口）`);
       setCreating(false);
       load();
@@ -121,9 +139,11 @@ export function OdfScreen({ navigation }: any) {
           <Text style={styles.headTitle}>光纤配线架</Text>
           <Text style={styles.headSub}>ODF 模块管理 / 全机房跳线总览</Text>
         </View>
-        <TouchableOpacity onPress={() => Alert.alert("提示", "全机房跳线总览请在 web 后台查看")}>
-          <Text style={styles.headLink}>↗ 总览</Text>
-        </TouchableOpacity>
+        {Platform.OS === "web" ? (
+          <TouchableOpacity onPress={() => Alert.alert("提示", "全机房跳线总览请在 web 后台查看")}>
+            <Text style={styles.headLink}>↗ 总览</Text>
+          </TouchableOpacity>
+        ) : null}
       </View>
 
       <SearchBar value={keyword} onChangeText={setKeyword} placeholder="搜索 ODF 模块名 / 编码" />
@@ -135,14 +155,14 @@ export function OdfScreen({ navigation }: any) {
 
       <View style={styles.chipRow}>
         <Chip label="全部光纤" active={fiber === ""} onPress={() => setFiber("")} />
-        <Chip label="单模" active={fiber === "single"} onPress={() => setFiber(fiber === "single" ? "" : "single")} />
-        <Chip label="多模" active={fiber === "multi"} onPress={() => setFiber(fiber === "multi" ? "" : "multi")} />
+        <Chip label="单模" active={fiber === "single-mode"} onPress={() => setFiber(fiber === "single-mode" ? "" : "single-mode")} />
+        <Chip label="多模" active={fiber === "multi-mode"} onPress={() => setFiber(fiber === "multi-mode" ? "" : "multi-mode")} />
       </View>
       <View style={styles.chipRow}>
         <Chip label="全部接口" active={portType === ""} onPress={() => setPortType("")} />
-        <Chip label="LC" active={portType === "lc"} onPress={() => setPortType(portType === "lc" ? "" : "lc")} />
-        <Chip label="SC" active={portType === "sc"} onPress={() => setPortType(portType === "sc" ? "" : "sc")} />
-        <Chip label="FC" active={portType === "fc"} onPress={() => setPortType(portType === "fc" ? "" : "fc")} />
+        <Chip label="LC" active={portType === "LC"} onPress={() => setPortType(portType === "LC" ? "" : "LC")} />
+        <Chip label="SC" active={portType === "SC"} onPress={() => setPortType(portType === "SC" ? "" : "SC")} />
+        <Chip label="MPO" active={portType === "MPO"} onPress={() => setPortType(portType === "MPO" ? "" : "MPO")} />
       </View>
 
       <View style={styles.toolbar}>
@@ -165,28 +185,40 @@ export function OdfScreen({ navigation }: any) {
       {/* 新建模块弹层 */}
       <Sheet visible={creating} title="新建 ODF 模块" onClose={() => setCreating(false)} scrollable>
         <View>
-          <Text style={styles.fLabel}>模块名称</Text>
-          <Input placeholder="如 A 区 ODF-01" value={mName} onChangeText={setMName} />
-          <Text style={styles.fLabel}>挂载机柜</Text>
-          <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled>
+          <Text style={styles.fLabel}>模块编码 *</Text>
+          <Input placeholder="如 ODF-A01" value={mName} onChangeText={setMName} />
+          <Text style={styles.fLabel}>A 端机柜 *</Text>
+          <ScrollView style={{ maxHeight: 160 }} nestedScrollEnabled>
             {racks.map((r) => (
               <ListRow key={r.id} title={r.code} subtitle={r.uHeight ? `${r.uHeight}U` : undefined}
                 right={mRackId === r.id ? <Text style={{ color: theme.accent, fontWeight: "700" }}>已选</Text> : null}
                 onPress={() => setMRackId(r.id)} />
             ))}
           </ScrollView>
+          <Text style={styles.fLabel}>A 端起始 U *</Text>
+          <Input placeholder="如 20" value={mUStart} onChangeText={setMUStart} keyboardType="numeric" />
+          <Text style={styles.fLabel}>B 端机柜 *</Text>
+          <ScrollView style={{ maxHeight: 160 }} nestedScrollEnabled>
+            {racks.map((r) => (
+              <ListRow key={r.id} title={r.code} subtitle={r.uHeight ? `${r.uHeight}U` : undefined}
+                right={mBRackId === r.id ? <Text style={{ color: theme.accent, fontWeight: "700" }}>已选</Text> : null}
+                onPress={() => setMBRackId(r.id)} />
+            ))}
+          </ScrollView>
+          <Text style={styles.fLabel}>B 端起始 U *</Text>
+          <Input placeholder="如 20" value={mBUStart} onChangeText={setMBUStart} keyboardType="numeric" />
           <Text style={styles.fLabel}>端口数</Text>
-          <Input placeholder="如 12" value={mPorts} onChangeText={setMPorts} />
+          <Input placeholder="如 24" value={mPorts} onChangeText={setMPorts} keyboardType="numeric" />
           <Text style={styles.fLabel}>光纤模式</Text>
           <View style={styles.chipRow}>
-            <Chip label="单模" active={mFiber === "single"} onPress={() => setMFiber("single")} />
-            <Chip label="多模" active={mFiber === "multi"} onPress={() => setMFiber("multi")} />
+            <Chip label="单模" active={mFiber === "single-mode"} onPress={() => setMFiber("single-mode")} />
+            <Chip label="多模" active={mFiber === "multi-mode"} onPress={() => setMFiber("multi-mode")} />
           </View>
           <Text style={styles.fLabel}>接口类型</Text>
           <View style={styles.chipRow}>
-            <Chip label="LC" active={mPortType === "lc"} onPress={() => setMPortType("lc")} />
-            <Chip label="SC" active={mPortType === "sc"} onPress={() => setMPortType("sc")} />
-            <Chip label="FC" active={mPortType === "fc"} onPress={() => setMPortType("fc")} />
+            <Chip label="LC" active={mPortType === "LC"} onPress={() => setMPortType("LC")} />
+            <Chip label="SC" active={mPortType === "SC"} onPress={() => setMPortType("SC")} />
+            <Chip label="MPO" active={mPortType === "MPO"} onPress={() => setMPortType("MPO")} />
           </View>
           <ToolBtn label={saving ? "创建中…" : "确认创建"} tone="primary" onPress={confirmCreate} />
         </View>

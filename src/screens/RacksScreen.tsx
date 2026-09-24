@@ -3,6 +3,7 @@ import { Alert, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, Vi
 import { apiCollect, apiList, apiPatch, apiPost } from "../api/client";
 import type { Customer, Floor, Rack, Zone } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
+import { useCan, customerScopeId } from "../auth/permission";
 import {
   Button,
   Chip,
@@ -33,7 +34,11 @@ const FEED_COLORS: Record<string, string> = {
 };
 
 export function RacksScreen({ navigation }: any) {
-  const { currentRoomId } = useAuth();
+  const { currentRoomId, user } = useAuth();
+  const can = useCan();
+  const canEditRack = can("rack", "update");
+  // 客户组成员：强制只看自己客户的机柜（对齐小程序 forcedCustomerId）
+  const forcedCust = customerScopeId(user);
   const [racks, setRacks] = useState<Rack[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -97,7 +102,7 @@ export function RacksScreen({ navigation }: any) {
         const res = await apiList<Rack>("/racks", {
           roomId: currentRoomId,
           search: keyword || undefined,
-          customerId: filterCustomerId || undefined,
+          customerId: forcedCust || filterCustomerId || undefined,
           page: 1,
           pageSize: pageSize === -1 ? 1000 : pageSize,
         });
@@ -183,7 +188,12 @@ export function RacksScreen({ navigation }: any) {
           density === "grid" ? (
             <RackCardSm item={item} onPress={() => navigation.navigate("RackDetail", { rackId: item.id, rackCode: item.code })} />
           ) : (
-            <RackCardFull item={item} onPress={() => navigation.navigate("RackDetail", { rackId: item.id, rackCode: item.code })} />
+            <RackCardFull
+              item={item}
+              onPress={() => navigation.navigate("RackDetail", { rackId: item.id, rackCode: item.code })}
+              // 此前从未传入 onEdit，editingRack 恒为 null → 编辑弹层永远打不开
+              onEdit={canEditRack ? () => setEditingRack(item) : undefined}
+            />
           )
         }
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={load} />}
@@ -537,6 +547,9 @@ function RackFormSheet({
   const [zones, setZones] = useState<Zone[]>([]);
   const [floorId, setFloorId] = useState<string | "">("");
   const [zoneId, setZoneId] = useState<string | "">("");
+  /** 平面图点阵列/行：不传的话新机柜在平面图里不可见 */
+  const [col, setCol] = useState("");
+  const [row, setRow] = useState("");
   const [busy, setBusy] = useState(false);
   const [showLoc, setShowLoc] = useState(false);
 
@@ -548,8 +561,11 @@ function RackFormSheet({
       setUHeight(String(editing.uHeight || 42));
       setCustomerId(editing.customerId || "");
       setFeeds(editing.powerFeeds || []);
+      setCol(editing.col != null ? String(editing.col) : "");
+      setRow(editing.row != null ? String(editing.row) : "");
     } else {
       setName(""); setUHeight("42"); setCustomerId(""); setFeeds([]);
+      setCol(""); setRow("");
     }
     setBusy(false);
     setFloorId(""); setZoneId(""); setShowLoc(false);
@@ -592,6 +608,8 @@ function RackFormSheet({
           uHeight: u,
           customerId: customerId || undefined,
           powerFeeds: feeds.length > 0 ? feeds : undefined,
+          col: col ? Number(col) : undefined,
+          row: row ? Number(row) : undefined,
         });
         onDone();
       } catch (e: any) {
@@ -603,17 +621,28 @@ function RackFormSheet({
     }
     if (!floorId) return Alert.alert("请选择楼层");
     if (!zoneId) return Alert.alert("请选择区域");
+    const z = zones.find((x) => x.id === zoneId);
+    const c = Number(col);
+    const r = Number(row);
+    if (!Number.isInteger(c) || c < 1) return Alert.alert("请填写平面图列号（≥1 整数）");
+    if (!Number.isInteger(r) || r < 1) return Alert.alert("请填写平面图行号（≥1 整数）");
+    if (z?.cols && c > z.cols) return Alert.alert(`列号超出区域范围（该区域共 ${z.cols} 列）`);
+    if (z?.rows && r > z.rows) return Alert.alert(`行号超出区域范围（该区域共 ${z.rows} 行）`);
     setBusy(true);
     try {
       await apiPost("/racks", {
         roomId: currentRoomId,
         floorId,
         zoneId,
-        name: name.trim() || undefined,
+        // CreateRackDto.name 是必填字符串，留空必须回落到编码，否则 400
+        name: name.trim() || codePreview || "机柜",
         uHeight: u,
         customerId: customerId || undefined,
         powerFeeds: feeds.length > 0 ? feeds : undefined,
-        code: codePreview,
+        code: codePreview || undefined,
+        // 落位：不传 col/row 时平面图里看不到这台机柜
+        col: c,
+        row: r,
       });
       onDone();
     } catch (e: any) {
@@ -664,8 +693,26 @@ function RackFormSheet({
 
       <View style={styles.formRow}>
         <Text style={styles.formLabel}>U 高 *</Text>
-        <Input value={uHeight} onChangeText={setUHeight} placeholder="如 42" />
+        <Input value={uHeight} onChangeText={setUHeight} placeholder="如 42" keyboardType="numeric" />
       </View>
+
+      {/* 平面图落位：不填列/行，新机柜在平面图里看不到 */}
+      <View style={styles.formRowInline}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.formLabel}>平面图列号 *</Text>
+          <Input value={col} onChangeText={setCol} placeholder="如 1" keyboardType="numeric" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.formLabel}>平面图行号 *</Text>
+          <Input value={row} onChangeText={setRow} placeholder="如 1" keyboardType="numeric" />
+        </View>
+      </View>
+      {zones.find((x) => x.id === zoneId)?.cols ? (
+        <Text style={styles.formHint}>
+          该区域网格：{zones.find((x) => x.id === zoneId)?.cols} 列 ×{" "}
+          {zones.find((x) => x.id === zoneId)?.rows} 行
+        </Text>
+      ) : null}
 
       {isEdit ? (
         <>
@@ -752,6 +799,8 @@ function LocationSheet({
         const r = await apiPost<{ id: string }>("/zones", {
           name: name.trim(),
           code: code.trim() || undefined,
+          // 顶层 POST /zones 强制要求 roomId，缺失直接 400「缺少所属机房 roomId」
+          roomId: currentRoomId,
           floorId,
           cols: Number(cols) || 6,
           rows: Number(rows) || 4,

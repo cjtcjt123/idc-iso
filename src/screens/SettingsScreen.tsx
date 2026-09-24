@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { apiPost, request } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
+import { toast } from "../components/toast";
 import { baseUrlStorage, roomStorage, tokenStorage } from "../storage";
 import { Button, Card, CardRow, Input, SectionCard } from "../components/ui";
 import { theme } from "../theme";
@@ -29,9 +30,9 @@ export function SettingsScreen() {
     setThemeMode(m);
     if (Platform.OS === "web") {
       try { (window as any).localStorage?.setItem("idcops_theme", m); } catch { /* localStorage disabled */ }
+      document.documentElement.dataset.theme = m === "auto" ? "" : m;
     }
-    document.documentElement.dataset.theme = m === "auto" ? "" : m;
-    setMsg(`主题已切换：${m === "light" ? "浅色" : m === "dark" ? "深色" : "跟随系统"}`);
+    setMsg(`主题已切换：${m === "light" ? "浅色" : m === "dark" ? "深色" : "跟随系统"}${Platform.OS === "web" ? "" : "（仅网页端生效）"}`);
   };
 
   const onChangePwd = async () => {
@@ -40,9 +41,11 @@ export function SettingsScreen() {
     setBusy(true);
     try {
       await apiPost("/auth/change-password", { oldPassword: oldPwd, newPassword: newPwd });
-      setMsg("密码已更新");
       setOldPwd("");
       setNewPwd("");
+      // 改密后旧 token 立即失效，强制重新登录（对齐小程序 removeToken + reLaunch）
+      toast("密码已更新", "出于安全，请重新登录");
+      await logout();
     } catch (e: any) {
       setMsg(`修改失败：${e?.message || e}`);
     } finally {
@@ -115,7 +118,11 @@ export function SettingsScreen() {
         </SectionCard>
 
         <SectionCard title="维护">
-          <CardRow icon="🧹" colors={theme.grad.odf} title="清理缓存" subtitle="清 localStorage 与浏览器缓存" onPress={onClearCache} />
+          {Platform.OS === "web" ? (
+            <CardRow icon="🧹" colors={theme.grad.odf} title="清理缓存" subtitle="清 localStorage 与浏览器缓存" onPress={onClearCache} />
+          ) : (
+            <CardRow icon="🧹" colors={theme.grad.odf} title="清理缓存" subtitle="仅网页端可用" />
+          )}
         </SectionCard>
 
         <SectionCard title="关于">

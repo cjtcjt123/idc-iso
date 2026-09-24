@@ -16,6 +16,7 @@ import {
   Sheet,
 } from "../components/ui";
 import { theme } from "../theme";
+import { customerScopeId } from "../auth/permission";
 
 type Density = "list" | "grid";
 
@@ -44,7 +45,9 @@ const PLACEMENT_TONE: Record<string, { fg: string; bg: string; text: string }> =
 };
 
 export function DevicesScreen({ navigation }: any) {
-  const { currentRoomId } = useAuth();
+  const { currentRoomId, user } = useAuth();
+  // 客户组成员：强制只看自己客户的设备（对齐小程序 forcedCustomerId）
+  const forcedCust = customerScopeId(user);
   const [devices, setDevices] = useState<Device[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -142,7 +145,7 @@ export function DevicesScreen({ navigation }: any) {
         const res = await apiList<Device>("/devices", {
           roomId: currentRoomId,
           search: keyword || undefined,
-          customerId: filterCustomerId || undefined,
+          customerId: forcedCust || filterCustomerId || undefined,
           typeId: filterTypeId || undefined,
           categoryId: filterCategoryId || undefined,
           page: 1,
@@ -160,6 +163,12 @@ export function DevicesScreen({ navigation }: any) {
   const totalPages = useMemo(
     () => Math.max(1, Math.ceil(total / (pageSize === -1 ? Math.max(total, 1) : pageSize))),
     [total, pageSize]
+  );
+
+  // 客户组成员强制作用域：前端兜底只显示自己客户的设备
+  const visibleDevices = useMemo(
+    () => (forcedCust ? devices.filter((d) => !d.customerId || d.customerId === forcedCust) : devices),
+    [devices, forcedCust]
   );
 
   if (loading) return <Loading />;
@@ -212,7 +221,7 @@ export function DevicesScreen({ navigation }: any) {
 
       {/* 设备列表 */}
       <FlatList
-        data={devices}
+        data={visibleDevices}
         keyExtractor={(d) => d.id}
         numColumns={density === "grid" ? 2 : 1}
         key={density}
@@ -450,6 +459,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   snItemText: { fontSize: 12, color: theme.text1, fontWeight: "600" },
+  snItemSub: { fontSize: 11, marginTop: 2 },
   snItemRemove: { fontSize: 14, color: theme.danger, paddingHorizontal: 4 },
 });
 
@@ -574,7 +584,14 @@ function MountSheet({
   );
 }
 
-/* ──── 下架弹层（按 SN 批量） ──── */
+/* ──── 下架弹层（按 SN 批量 → 解析为设备 UUID 后提交） ──── */
+type DismountItem = {
+  sn: string;
+  deviceId: string | null;
+  label: string; // 解析结果说明
+  ok: boolean; // 是否已解析到「已上架」设备
+};
+
 function DismountSheet({
   visible, onClose, onDone, currentRoomId,
 }: {
@@ -584,36 +601,64 @@ function DismountSheet({
   currentRoomId: string;
 }) {
   const [snInput, setSnInput] = useState("");
-  const [snList, setSnList] = useState<string[]>([]);
+  const [items, setItems] = useState<DismountItem[]>([]);
   const [reason, setReason] = useState("");
   const [destination, setDestination] = useState<"inventory" | "shipped">("inventory");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (visible) {
-      setSnInput(""); setSnList([]); setReason(""); setDestination("inventory"); setBusy(false);
+      setSnInput(""); setItems([]); setReason(""); setDestination("inventory"); setBusy(false);
     }
   }, [visible]);
 
-  const addSn = () => {
+  /**
+   * SN → 设备 UUID。
+   * 后端 BatchDismountDto 的 deviceIds 是 @IsUUID("4", { each: true })，直接传 SN 必然 400；
+   * 且设备必须已在机柜上（!rackId 会被后端拒绝）。
+   */
+  const resolveSn = async (sn: string): Promise<DismountItem> => {
+    try {
+      // 坑：/devices 的 search 与 roomId 共用同一 OR key，同时传搜索会静默失效 → 只传 search，客户端再按机房过滤
+      const res = await apiList<Device>("/devices", { search: sn, pageSize: 50 });
+      const hit = (res.data || []).find(
+        (d) => (d.sn || "").toLowerCase() === sn.toLowerCase() && (!d.roomId || d.roomId === currentRoomId)
+      );
+      if (!hit) return { sn, deviceId: null, label: "未找到该 SN", ok: false };
+      if (!hit.rackId) return { sn, deviceId: hit.id, label: "未在机柜上，无需下架", ok: false };
+      return { sn, deviceId: hit.id, label: hit.rackText || hit.rackCode || "已上架", ok: true };
+    } catch (e: any) {
+      return { sn, deviceId: null, label: "查询失败", ok: false };
+    }
+  };
+
+  const addSn = async () => {
     const s = snInput.trim();
-    if (!s) return;
-    if (snList.includes(s)) {
+    if (!s || busy) return;
+    if (items.some((i) => i.sn.toLowerCase() === s.toLowerCase())) {
       setSnInput("");
       return;
     }
-    setSnList([...snList, s]);
     setSnInput("");
+    setBusy(true);
+    const item = await resolveSn(s);
+    setItems((prev) => [...prev, item]);
+    setBusy(false);
   };
 
   const submit = async () => {
-    if (snList.length === 0) return Alert.alert("请输入至少一个设备 SN");
+    if (items.length === 0) return Alert.alert("请输入至少一个设备 SN");
+    const bad = items.filter((i) => !i.ok);
+    if (bad.length > 0) {
+      return Alert.alert("以下 SN 无法下架", bad.map((i) => `${i.sn}（${i.label}）`).join("\n"));
+    }
     if (!reason.trim()) return Alert.alert("请填写下架原因");
+    const deviceIds = [...new Set(items.map((i) => i.deviceId!))];
+    if (deviceIds.length > 200) return Alert.alert("单次最多下架 200 台");
     setBusy(true);
     try {
-      // 后端 batch-dismount 接受 deviceIds（实际 SN 字段也接受，由后端按 SN 解析）
       await apiPost("/devices/batch-dismount", {
-        deviceIds: snList,
+        deviceIds,
         reason: reason.trim(),
         destination,
       });
@@ -625,25 +670,30 @@ function DismountSheet({
     }
   };
 
+  const okCount = items.filter((i) => i.ok).length;
+
   return (
     <Sheet visible={visible} onClose={onClose} title="批量下架" scrollable>
-      <Text style={styles.formHint}>依次输入设备 SN 加入下架队列，填写去向与原因后提交</Text>
+      <Text style={styles.formHint}>依次输入设备 SN 加入下架队列（会自动解析为设备），填写去向与原因后提交</Text>
 
       <View style={[styles.formRowInline, { marginTop: 10 }]}>
         <View style={{ flex: 1 }}>
           <Input value={snInput} onChangeText={setSnInput} placeholder="设备 SN" />
         </View>
         <TouchableOpacity onPress={addSn} style={styles.toolBtn}>
-          <Text style={styles.toolBtnText}>追加</Text>
+          <Text style={styles.toolBtnText}>{busy ? "…" : "追加"}</Text>
         </TouchableOpacity>
       </View>
 
-      {snList.length > 0 ? (
+      {items.length > 0 ? (
         <View style={styles.snList}>
-          {snList.map((s) => (
-            <View key={s} style={styles.snItem}>
-              <Text style={styles.snItemText}>{s}</Text>
-              <TouchableOpacity onPress={() => setSnList(snList.filter((x) => x !== s))}>
+          {items.map((it) => (
+            <View key={it.sn} style={styles.snItem}>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={styles.snItemText}>{it.sn}</Text>
+                <Text style={[styles.snItemSub, { color: it.ok ? theme.text3 : theme.danger }]}>{it.label}</Text>
+              </View>
+              <TouchableOpacity onPress={() => setItems(items.filter((x) => x.sn !== it.sn))}>
                 <Text style={styles.snItemRemove}>✕</Text>
               </TouchableOpacity>
             </View>
@@ -664,7 +714,7 @@ function DismountSheet({
         <Input value={reason} onChangeText={setReason} placeholder="必填" />
       </View>
 
-      <Button label={busy ? "提交中…" : `确认下架 (${snList.length})`} onPress={submit} loading={busy} danger />
+      <Button label={busy ? "提交中…" : `确认下架 (${okCount})`} onPress={submit} loading={busy} danger />
     </Sheet>
   );
 }

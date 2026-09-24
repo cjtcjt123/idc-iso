@@ -32,6 +32,7 @@ interface AuthState {
   login: (identifier: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   setRoom: (roomId: string | null) => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -108,8 +109,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     else await roomStorage.clear();
   };
 
+  /** 重新拉取当前账号信息（对齐小程序 profile onShow 调 /auth/me）。 */
+  const refreshUser = async () => {
+    try {
+      const me = await apiGet<AuthUser>("/auth/me");
+      setUser(me);
+    } catch {
+      /* 401 已由 client 处理并清空登录态 */
+    }
+  };
+
   const value = useMemo<AuthState>(
-    () => ({ user, token, ready, currentRoomId, login, logout, setRoom }),
+    () => ({ user, token, ready, currentRoomId, login, logout, setRoom, refreshUser }),
     [user, token, ready, currentRoomId]
   );
 

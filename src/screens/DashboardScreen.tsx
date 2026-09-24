@@ -1,17 +1,20 @@
 import React, { useEffect, useState } from "react";
-import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Alert, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { apiCollect, apiGet, apiList } from "../api/client";
 import type { DashboardStats, OperationRecord, Room } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
+import { toast } from "../components/toast";
 import {
   ActivityRow,
   ACTIVITY_LABEL,
+  Button,
   HeroCard,
   IconChip,
   MiniBarChart,
   ProgressBar,
   RoomPill,
   SectionCard,
+  Sheet,
   StatCard,
 } from "../components/ui";
 import { theme } from "../theme";
@@ -39,12 +42,13 @@ export function DashboardScreen({ navigation }: any) {
   const [ops, setOps] = useState<OperationRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [opDetail, setOpDetail] = useState<OperationRecord | null>(null);
 
   const load = async () => {
     const roomId = currentRoomId || undefined;
     const [s, rooms, feed] = await Promise.allSettled([
       apiGet<DashboardStats>("/stats/dashboard" + (roomId ? `?roomId=${roomId}` : "")),
-      apiList<Room>("/rooms", { pageSize: 100 }),
+      apiList<Room>("/rooms/mine", { pageSize: 100 }),
       apiCollect<OperationRecord>("/inventory/operations", {
         limit: 8,
         kind: HOME_LOG_KINDS,
@@ -53,6 +57,7 @@ export function DashboardScreen({ navigation }: any) {
     ]);
 
     if (s.status === "fulfilled") setStats(s.value);
+    else toast("统计加载失败", (s.reason as any)?.message || "请稍后下拉刷新重试");
     if (rooms.status === "fulfilled") {
       const list = rooms.value.data;
       const cur = list.find((r) => r.id === currentRoomId);
@@ -67,6 +72,14 @@ export function DashboardScreen({ navigation }: any) {
   useEffect(() => {
     load();
   }, [currentRoomId]);
+
+  // 每次切回首页（tab 聚焦）重新拉取，对齐小程序 onShow→loadAll()
+  useEffect(() => {
+    const unsub = navigation.addListener("focus", () => {
+      void load();
+    });
+    return unsub;
+  }, [navigation, currentRoomId]);
 
   if (loading) {
     return (
@@ -128,8 +141,15 @@ export function DashboardScreen({ navigation }: any) {
           <HeroCard
             icon="📷"
             title="扫一扫"
-            subtitle="入库 / 出库 / 查询设备"
-            onPress={() => navigation.navigate("库存Tab", { screen: "Scan" })}
+            subtitle="入库 / 出库 / 盘点"
+            onPress={() =>
+              Alert.alert("扫一扫", "选择操作类型", [
+                { text: "入库", onPress: () => navigation.navigate("库存Tab", { screen: "StockIn" }) },
+                { text: "出库", onPress: () => navigation.navigate("库存Tab", { screen: "StockOut" }) },
+                { text: "盘点", onPress: () => navigation.navigate("库存Tab", { screen: "CountList" }) },
+                { text: "取消", style: "cancel" },
+              ])
+            }
           />
         </View>
 
@@ -174,13 +194,28 @@ export function DashboardScreen({ navigation }: any) {
         <View style={{ paddingHorizontal: 16, marginTop: 12 }}>
           <TouchableOpacity
             activeOpacity={0.9}
-            onPress={() => navigation.navigate("我的Tab", { screen: "Customers" })}
+            onPress={() => navigation.navigate("我的Tab", { screen: "CustomerAuthorization" })}
             style={styles.entry}
           >
             <IconChip icon="📝" colors={theme.grad.hero} size={42} radius={12} />
             <View style={{ flex: 1, marginLeft: 13 }}>
               <Text style={styles.entryTitle}>授权工单</Text>
               <Text style={styles.entrySub}>客户授权我们对设备的操作留痕</Text>
+            </View>
+            <Text style={styles.entryArrow}>›</Text>
+          </TouchableOpacity>
+
+          {/* 统计报表入口（对齐小程序首页「客户统计」；兼 P3 首页入口） */}
+          <View style={{ height: 10 }} />
+          <TouchableOpacity
+            activeOpacity={0.9}
+            onPress={() => navigation.navigate("我的Tab", { screen: "Stats" })}
+            style={styles.entry}
+          >
+            <IconChip icon="📊" colors={theme.grad.customer} size={42} radius={12} />
+            <View style={{ flex: 1, marginLeft: 13 }}>
+              <Text style={styles.entryTitle}>统计报表</Text>
+              <Text style={styles.entrySub}>设备 / 机柜 / 库存 / 客户 分布</Text>
             </View>
             <Text style={styles.entryArrow}>›</Text>
           </TouchableOpacity>
@@ -235,7 +270,7 @@ export function DashboardScreen({ navigation }: any) {
           <SectionCard
             title="操作记录"
             right={
-              <TouchableOpacity onPress={() => navigation.navigate("我的Tab", { screen: "Operations" })}>
+              <TouchableOpacity onPress={() => navigation.navigate("库存Tab", { screen: "Logs" })}>
                 <Text style={{ color: theme.accent, fontSize: 13, fontWeight: "600" }}>查看全部 ›</Text>
               </TouchableOpacity>
             }
@@ -249,12 +284,31 @@ export function DashboardScreen({ navigation }: any) {
                   kind={o.kind}
                   desc={o.summary || ACTIVITY_LABEL[o.kind || ""] || o.kind || "操作记录"}
                   meta={[o.operator, o.createdAt].filter(Boolean).join(" · ")}
+                  onPress={() => setOpDetail(o)}
                 />
               ))
             )}
           </SectionCard>
         </View>
       </ScrollView>
+
+      <Sheet visible={!!opDetail} title="操作详情" onClose={() => setOpDetail(null)}>
+        {opDetail ? (
+          <View>
+            <Text style={styles.opKind}>{ACTIVITY_LABEL[opDetail.kind || ""] || opDetail.kind || "操作"}</Text>
+            <Text style={styles.opDesc}>{opDetail.summary || "（无摘要）"}</Text>
+            {opDetail.operator ? <Text style={styles.opMeta}>操作人：{opDetail.operator}</Text> : null}
+            {opDetail.createdAt ? <Text style={styles.opMeta}>时间：{opDetail.createdAt}</Text> : null}
+            <Button
+              label="查看完整操作日志"
+              onPress={() => {
+                setOpDetail(null);
+                navigation.navigate("我的Tab", { screen: "Operations" });
+              }}
+            />
+          </View>
+        ) : null}
+      </Sheet>
     </View>
   );
 }
@@ -287,4 +341,7 @@ const styles = StyleSheet.create({
   legend: { flexDirection: "row", gap: 16, marginTop: 6 },
   lgUp: { fontSize: 11, color: theme.accent },
   lgDown: { fontSize: 11, color: "#9aa6bd" },
+  opKind: { fontSize: 15, fontWeight: "700", color: theme.text1, marginBottom: 8 },
+  opDesc: { fontSize: 13, color: theme.text2, lineHeight: 20, marginBottom: 12 },
+  opMeta: { fontSize: 12, color: theme.text3, marginBottom: 4 },
 });

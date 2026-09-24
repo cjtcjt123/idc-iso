@@ -93,14 +93,14 @@ export function CategoriesScreen({ navigation }: any) {
     }
   }
 
-  async function loadProducts(catId: string, reset: boolean) {
+  async function loadProducts(catId: string, reset: boolean, kw?: string) {
     if (prodLoading) return;
     const page = reset ? 1 : prodPage + 1;
     setProdLoading(true);
     try {
       const res = await apiList<InventoryItem>("/inventory/items", {
         categoryId: catId,
-        q: prodKeyword.trim() || undefined,
+        q: (kw ?? prodKeyword).trim() || undefined,
         page,
         pageSize: 30,
         sort: "name:asc",
@@ -190,7 +190,7 @@ export function CategoriesScreen({ navigation }: any) {
         <FlatList
           data={nodes}
           keyExtractor={(n) => n.id}
-          ListHeaderComponent={selectedCatId ? <ProductHeader name={selectedCatName} total={prodTotal} canAdd={can("inventory", "create")} onAdd={() => navigation.navigate("ProductEdit", { categoryId: selectedCatId, categoryName: selectedCatName })} onClose={() => { setSelectedCatId(""); setSelectedCatName(""); setProducts([]); }} /> : null}
+          ListHeaderComponent={selectedCatId ? <ProductHeader name={selectedCatName} total={prodTotal} keyword={prodKeyword} onSearch={(t) => { setProdKeyword(t); loadProducts(selectedCatId, true, t.trim()); }} canAdd={can("inventory", "create")} onAdd={() => navigation.navigate("ProductEdit", { categoryId: selectedCatId, categoryName: selectedCatName })} onClose={() => { setSelectedCatId(""); setSelectedCatName(""); setProducts([]); }} /> : null}
           ListFooterComponent={selectedCatId ? <ProductList products={products} loading={prodLoading} hasMore={prodPage < prodTotalPages} onLoadMore={() => loadProducts(selectedCatId, false)} onTap={(p) => navigation.navigate("ProductEdit", { id: p.id })} /> : null}
           refreshControl={<RefreshControl refreshing={false} onRefresh={loadTree} />}
           contentContainerStyle={{ paddingBottom: 20 }}
@@ -241,7 +241,7 @@ export function CategoriesScreen({ navigation }: any) {
   );
 }
 
-function ProductHeader({ name, total, canAdd, onAdd, onClose }: { name: string; total: number; canAdd: boolean; onAdd: () => void; onClose: () => void }) {
+function ProductHeader({ name, total, keyword, onSearch, canAdd, onAdd, onClose }: { name: string; total: number; keyword: string; onSearch: (t: string) => void; canAdd: boolean; onAdd: () => void; onClose: () => void }) {
   return (
     <View style={s.prodHead}>
       <TouchableOpacity onPress={onClose} style={s.prodBack}>
@@ -255,6 +255,14 @@ function ProductHeader({ name, total, canAdd, onAdd, onClose }: { name: string; 
           </TouchableOpacity>
         ) : null}
       </View>
+      <TextInput
+        style={s.search}
+        value={keyword}
+        onChangeText={onSearch}
+        placeholder="搜索该分类下物料名称 / 型号"
+        placeholderTextColor={theme.text3}
+        clearButtonMode="while-editing"
+      />
     </View>
   );
 }
@@ -303,6 +311,15 @@ const s = StyleSheet.create({
   prodBack: { marginBottom: 6 },
   prodBackText: { color: theme.text3, fontSize: 13 },
   prodHeadTitle: { fontSize: 17, fontWeight: "700", color: theme.text1, flex: 1 },
+  search: {
+    marginTop: 10,
+    backgroundColor: theme.track,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    fontSize: 14,
+    color: theme.text1,
+  },
   prodCard: { flexDirection: "row", alignItems: "center", backgroundColor: theme.surface, marginHorizontal: 16, marginVertical: 4, borderRadius: 12, padding: 14 },
   prodName: { fontSize: 15, fontWeight: "600", color: theme.text1 },
   prodSub: { fontSize: 12, color: theme.text3, marginTop: 2 },

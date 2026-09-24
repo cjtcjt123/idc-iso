@@ -21,23 +21,38 @@ function unitColor(status?: string): string {
   }
 }
 
+const ODF_COLOR = "#06b6d4";
 const U_ROW_H = 26;
 
 export function RackElevation({
   units,
   onUnitPress,
+  onOdfPress,
 }: {
   units: RackUnit[];
   onUnitPress?: (deviceId: string) => void;
+  onOdfPress?: (odfId: string) => void;
 }) {
   // units 已由后端按「顶(uHeight) → 底(1)」排序，直接渲染即可
   return (
     <View style={styles.frame}>
       <ScrollView>
         {units.map((u) => {
-          const color = unitColor(u.status);
-          const label = u.modelName || u.name || "设备";
-          const canPress = u.occupied && !!u.id && !!onUnitPress;
+          const dev = u.device;
+          const odf = u.odf;
+          const color = odf && !dev ? ODF_COLOR : unitColor(dev?.status);
+          // 机柜 U 位图按约定展示「型号 + SN」而不是内部编码 name
+          const label = dev
+            ? dev.modelName || dev.name || "设备"
+            : odf
+            ? `${odf.code || "ODF"}·${odf.end || "A"}端`
+            : "";
+          const tail = dev?.sn ? ` · ${dev.sn}` : "";
+          const onPress = dev
+            ? onUnitPress && (() => onUnitPress(dev.id))
+            : odf
+            ? onOdfPress && (() => onOdfPress(odf.id))
+            : undefined;
           const slot = (
             <View
               style={[
@@ -48,7 +63,7 @@ export function RackElevation({
               {u.occupied ? (
                 <Text style={styles.slotText} numberOfLines={1}>
                   {label}
-                  {u.serialNumber ? ` · ${u.serialNumber}` : ""}
+                  {tail}
                 </Text>
               ) : null}
             </View>
@@ -56,8 +71,8 @@ export function RackElevation({
           return (
             <View key={u.u} style={styles.row}>
               <Text style={styles.uLabel}>{u.u}U</Text>
-              {canPress ? (
-                <TouchableOpacity style={{ flex: 1 }} onPress={() => onUnitPress!(u.id!)}>
+              {onPress ? (
+                <TouchableOpacity style={{ flex: 1 }} onPress={onPress}>
                   {slot}
                 </TouchableOpacity>
               ) : (

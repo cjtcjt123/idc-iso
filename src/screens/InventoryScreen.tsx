@@ -350,12 +350,20 @@ export function InventoryScreen({ navigation }: any) {
     const useCsv = batchUMode === "import";
     if (!useCsv && !batchRackId) { alert("请选择目标机柜"); return; }
     if (useCsv && !batchItems.length) { alert("请先解析 CSV"); return; }
-    const list = batchItems.map((it) => {
-      const uPos = batchUMode === "auto" ? (Number(batchU) || 1) : Number(it.uPos);
-      const rackId = batchUMode === "import" ? it.rackId! : batchRackId;
-      return { deviceId: it.deviceId, rackId, uPosition: uPos };
-    }).filter((x) => x.uPosition >= 1 && x.rackId);
+    // 「顺排」模式：起始 U 位 + 逐台按 U 高递增（此前所有设备写同一个 U 位 → 必定冲突失败）
+    const startU = Number(batchU) || 1;
+    let cursor = startU;
+    const list: { deviceId: string; rackId: string; uPosition: number }[] = [];
+    for (const it of batchItems) {
+      const isCsv = batchUMode === "import";
+      const rackId = isCsv ? it.rackId : batchRackId;
+      const uPosition = isCsv ? Number(it.uPos) : cursor;
+      const h = Math.max(1, Number(it.uHeight) || 1);
+      if (!isCsv) cursor += h;
+      if (uPosition >= 1 && rackId) list.push({ deviceId: it.deviceId, rackId, uPosition });
+    }
     if (!list.length) { alert("请填写有效 U 位"); return; }
+    if (list.length > 200) { alert("单次最多上架 200 台"); return; }
     setBatchMounting(true);
     try {
       const res: any = await apiPost("/devices/batch-mount", { items: list });

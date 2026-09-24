@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { Clipboard, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useAuth } from "../auth/AuthContext";
+import { isAdmin } from "../auth/permission";
+import { toast } from "../components/toast";
 import { apiCollect } from "../api/client";
 import { Badge, Button, Card, IconChip } from "../components/ui";
 import { ServerAddressEditor } from "../components/ServerAddressEditor";
@@ -37,7 +39,7 @@ function roleTextOf(u: { isSuperuser?: boolean; role?: string } | null): string 
 }
 
 export function ProfileScreen({ navigation }: any) {
-  const { user, logout, currentRoomId } = useAuth();
+  const { user, logout, currentRoomId, refreshUser } = useAuth();
   const [roomName, setRoomName] = useState("未选择机房");
   const [roomCount, setRoomCount] = useState(0);
   const [showAbout, setShowAbout] = useState(false);
@@ -57,9 +59,17 @@ export function ProfileScreen({ navigation }: any) {
     })();
   }, [currentRoomId]);
 
+  // 每次进入「我的」刷新账号信息（对齐小程序 profile onShow 调 /auth/me）
+  useEffect(() => {
+    const unsub = navigation.addListener("focus", () => {
+      void refreshUser();
+    });
+    return unsub;
+  }, [navigation, refreshUser]);
+
   const initial = (user?.username || "U").charAt(0).toUpperCase();
   const roleText = roleTextOf(user);
-  const isSuper = !!user?.isSuperuser;
+  const isSuper = isAdmin(user);
 
   const groups: { title: string; items: MenuItem[] }[] = [
     {
@@ -80,10 +90,12 @@ export function ProfileScreen({ navigation }: any) {
       title: "运维工具",
       items: [
         { title: "客户管理", sub: "客户档案与归属", icon: "👥", colors: theme.grad.customer, route: "Customers" },
+        { title: "客户授权", sub: "9 类授权单登记", icon: "📝", colors: ["#fbc17d", "#f79009"], route: "CustomerAuthorization" },
         { title: "统计报表", sub: "设备 / 机柜 / 库存 分布", icon: "📊", colors: ["#5ce0a8", "#12b76a"], route: "Stats" },
         { title: "网络管理", sub: "子网与 IP 地址", icon: "🔗", colors: ["#22d3ee", "#0d9488"], route: "Network" },
         { title: "导入导出", sub: "批量 xlsx", icon: "⬆️", colors: ["#b6a4fb", "#7c3aed"], route: "ImportExport" },
-        { title: "操作记录", sub: "全量流水与审计", icon: "📋", colors: ["#fbc17d", "#f79009"], route: "Operations" },
+        { title: "操作记录", sub: "全量流水与审计", icon: "📋", colors: ["#fbc17d", "#f79009"], route: "库存Tab", params: { screen: "Logs" } },
+        { title: "枚举中心", sub: "选项字典管理", icon: "🗂️", colors: ["#aeb6c6", "#475467"], route: "EnumCenter" },
       ],
     },
     {
@@ -181,7 +193,15 @@ export function ProfileScreen({ navigation }: any) {
             <AboutRow label="邮箱" value={user?.email || "-"} />
             <AboutRow label="角色" value={roleText} />
             <AboutRow label="员工账号" value={user?.username || "-"} />
-            <TouchableOpacity activeOpacity={0.8} onPress={() => user?.tenantId && Clipboard.setString(user.tenantId)}>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => {
+                if (user?.tenantId) {
+                  Clipboard.setString(user.tenantId);
+                  toast("已复制", "租户 ID 已复制到剪贴板");
+                }
+              }}
+            >
               <AboutRow label="租户 ID" value={user?.tenantId || "-"} copyable />
             </TouchableOpacity>
             <AboutRow label="应用" value="IDC管理工具" />

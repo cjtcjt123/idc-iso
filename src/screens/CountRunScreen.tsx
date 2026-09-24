@@ -35,6 +35,8 @@ export function CountRunScreen({ route, navigation }: any) {
   const [busy, setBusy] = useState(false);
   const [unexpected, setUnexpected] = useState(false);
   const [unexpName, setUnexpName] = useState("");
+  /** 盘盈编码单独存：核对框的 code 在扫码后会清空，若复用会导致「请先填写盘盈编码」必现 */
+  const [unexpCode, setUnexpCode] = useState("");
   const [itemSheet, setItemSheet] = useState<CountItemVM | null>(null);
 
   const load = async () => {
@@ -66,6 +68,9 @@ export function CountRunScreen({ route, navigation }: any) {
       setTask(r.task);
       setCode("");
       if (!r.matched) {
+        // 把未命中的编码带进盘盈弹层（否则弹层一打开就是空编码，必报「请先填写盘盈编码」）
+        setUnexpCode(c);
+        setUnexpName("");
         setUnexpected(true);
       } else {
         Alert.alert("已核对", r.item?.result === "misplaced" ? "机柜不一致 · 标记移位" : "正常");
@@ -78,20 +83,20 @@ export function CountRunScreen({ route, navigation }: any) {
   };
 
   const addUnexpected = async () => {
-    if (!code.trim()) {
+    if (!unexpCode.trim()) {
       Alert.alert("请先填写盘盈编码");
       return;
     }
     setBusy(true);
     try {
       const t = await apiPost<CountTaskVM>(`/inventory/counts/${id}/unexpected`, {
-        code: code.trim(),
+        code: unexpCode.trim(),
         name: unexpName.trim() || undefined,
       });
       setTask(t);
       setUnexpected(false);
       setUnexpName("");
-      setCode("");
+      setUnexpCode("");
     } catch (e: any) {
       Alert.alert("登记失败", e?.message || "操作失败");
     } finally {
@@ -194,7 +199,7 @@ export function CountRunScreen({ route, navigation }: any) {
       {/* 盘盈登记 */}
       <Sheet visible={unexpected} title="盘盈登记" onClose={() => setUnexpected(false)} scrollable>
         <Text style={styles.fLabel}>编码</Text>
-        <Input value={code} onChangeText={setCode} placeholder="清单外编码" />
+        <Input value={unexpCode} onChangeText={setUnexpCode} placeholder="清单外编码" />
         <Text style={styles.fLabel}>名称（可选）</Text>
         <Input value={unexpName} onChangeText={setUnexpName} placeholder="便于识别" />
         <Button label="登记盘盈" onPress={addUnexpected} loading={busy} />

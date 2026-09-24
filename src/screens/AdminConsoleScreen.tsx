@@ -1,6 +1,7 @@
 import React from "react";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useAuth } from "../auth/AuthContext";
+import { isAdmin } from "../auth/permission";
 import { SectionCard } from "../components/ui";
 import { theme } from "../theme";
 
@@ -13,32 +14,30 @@ interface AdminTile {
   params?: Record<string, unknown>;
 }
 
+// 仅保留后端已落地、且 ProfileStack 内已注册路由的目标；无 route 的死块一律删除
 const COMMON: AdminTile[] = [
   { title: "客户管理", sub: "客户档案与归属", icon: "👥", colors: theme.grad.customer, route: "Customers" },
-  { title: "用户管理", sub: "账号与权限", icon: "🧑‍💼", colors: ["#5aa9ff", "#1d6bff"] },
-  { title: "角色权限", sub: "RBAC 矩阵", icon: "🔐", colors: theme.grad.inventory },
   { title: "审计日志", sub: "全量操作审计", icon: "📜", colors: ["#aeb6c6", "#475467"], route: "Audit" },
-  { title: "数据备份", sub: "备份 / 恢复 / 下载", icon: "💾", colors: theme.grad.odf },
   { title: "导入导出", sub: "批量 xlsx", icon: "⬆️", colors: ["#b6a4fb", "#7c3aed"], route: "ImportExport" },
+  { title: "用户与权限", sub: "账号 / 角色矩阵", icon: "🛡️", colors: ["#aeb6c6", "#475467"], route: "UserManagement" },
+  { title: "数据备份", sub: "备份 / 恢复 / 下载", icon: "💾", colors: ["#5ce0a8", "#12b76a"], route: "Backup" },
 ];
 
 const CONFIGS: AdminTile[] = [
   { title: "网络管理", sub: "子网与 IP", icon: "🔗", colors: theme.grad.odf, route: "Network" },
   { title: "统计报表", sub: "设备/机柜/库存", icon: "📊", colors: ["#5ce0a8", "#12b76a"], route: "Stats" },
-  { title: "选项管理", sub: "枚举中心", icon: "🏷️", colors: ["#5aa9ff", "#1d6bff"] },
-  { title: "物品与分类", sub: "物料字典", icon: "📦", colors: theme.grad.inventory },
-  { title: "库位管理", sub: "仓库位", icon: "📍", colors: ["#22d3ee", "#0d9488"] },
-  { title: "客户授权", sub: "9 类授权", icon: "✅", colors: theme.grad.customer },
+  { title: "物品与分类", sub: "物料字典", icon: "📦", colors: theme.grad.inventory, route: "Categories" },
+  { title: "库位管理", sub: "仓库位", icon: "📍", colors: ["#22d3ee", "#0d9488"], route: "Locations" },
 ];
 
 export function AdminConsoleScreen({ navigation }: any) {
   const { user } = useAuth();
-  const isSuper = !!user?.isSuperuser;
+  const isSuper = isAdmin(user);
 
   if (!isSuper) {
     return (
       <View style={styles.noAccess}>
-        <Text style={styles.noAccessTxt}>仅超级管理员可访问</Text>
+        <Text style={styles.noAccessTxt}>仅管理员可访问</Text>
       </View>
     );
   }
